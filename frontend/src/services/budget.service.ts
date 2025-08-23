@@ -1,42 +1,5 @@
 import { api } from './api';
-
-export interface BudgetCategory {
-  id: number;
-  name: string;
-  allocatedAmount: number;
-  spent?: number;
-  available?: number;
-}
-
-export interface BudgetGroup {
-  id: number;
-  name: string;
-  monthYear: Date;
-  categories: BudgetCategory[];
-}
-
-export interface MonthlyBudget {
-  groups: BudgetGroup[];
-  readyToAssign: number;
-  totalIncome: number;
-  totalAllocated: number;
-}
-
-export interface CreateGroupDto {
-  name: string;
-  monthYear: Date;
-}
-
-export interface CreateCategoryDto {
-  name: string;
-  allocatedAmount: number;
-  groupId: number;
-}
-
-export interface UpdateCategoryDto {
-  allocatedAmount?: number;
-  name?: string;
-}
+import type { CreateGroupDto, CreateCategoryDto, UpdateCategoryDto, UpdateGroupDto } from '../types';
 
 export const budgetService = {
   async getMonthlyBudget(month: Date) {
@@ -67,6 +30,44 @@ export const budgetService = {
       return data;
     } catch (error) {
       console.error('Erro ao atualizar categoria:', error);
+      throw error;
+    }
+  },
+
+  async createGroup(dto: CreateGroupDto) {
+    try {
+      const { data } = await api.post('/budgets/groups', dto);
+      return data;
+    } catch (error) {
+      console.error('Erro ao criar grupo:', error);
+      throw error;
+    }
+  },
+
+  async updateGroup(id: number, dto: UpdateGroupDto) {
+    try {
+      const { data } = await api.patch(`/budgets/groups/${id}`, dto);
+      return data;
+    } catch (error) {
+      console.error('Erro ao atualizar grupo:', error);
+      throw error;
+    }
+  },
+
+  async deleteGroup(id: number) {
+    try {
+      await api.delete(`/budgets/groups/${id}`);
+    } catch (error) {
+      console.error('Erro ao deletar grupo:', error);
+      throw error;
+    }
+  },
+
+  async deleteCategory(id: number) {
+    try {
+      await api.delete(`/budgets/categories/${id}`);
+    } catch (error) {
+      console.error('Erro ao deletar categoria:', error);
       throw error;
     }
   }

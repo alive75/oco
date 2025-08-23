@@ -14,7 +14,11 @@
       "Bash(docker exec:*)",
       "Bash(PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d oco_db -c \"\\du\")",
       "Bash(docker logs:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(npx shadcn-ui@latest add:*)",
+      "Bash(npx shadcn@latest add:*)",
+      "Bash(npm run build:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []

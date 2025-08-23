@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
+// Usando input HTML padrão por enquanto
+// import { Input } from '@/components/ui/input';
+// import { cn } from '@/lib/utils';
 
 interface MoneyInputProps {
   value?: number;
@@ -26,14 +27,15 @@ export function MoneyInput({ value = 0, onChange, placeholder = "R$ 0,00", class
     }).format(amount);
   };
 
-  const parseCurrency = (formatted: string): number => {
-    const cleanedValue = formatted
-      .replace(/[^\d,-]/g, '')
-      .replace(',', '.');
-    
-    const numericValue = parseFloat(cleanedValue);
-    return isNaN(numericValue) ? 0 : numericValue;
-  };
+  // Função removida por não estar sendo usada
+  // const parseCurrency = (formatted: string): number => {
+  //   const cleanedValue = formatted
+  //     .replace(/[^\d,-]/g, '')
+  //     .replace(',', '.');
+  //   
+  //   const numericValue = parseFloat(cleanedValue);
+  //   return isNaN(numericValue) ? 0 : numericValue;
+  // };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const inputValue = e.target.value;
@@ -70,13 +72,13 @@ export function MoneyInput({ value = 0, onChange, placeholder = "R$ 0,00", class
   };
 
   return (
-    <Input
+    <input
       type="text"
       value={displayValue}
       onChange={handleChange}
       onBlur={handleBlur}
       placeholder={placeholder}
-      className={cn("font-mono", className)}
+      className={`font-mono px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:border-blue-500 ${className}`}
       disabled={disabled}
     />
   );

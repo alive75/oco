@@ -1,12 +1,11 @@
 import { create } from 'zustand';
-import { budgetService, BudgetGroup, CreateGroupDto, CreateCategoryDto, UpdateCategoryDto } from '@/services/budget.service';
+import { budgetService } from '../services/budget.service';
+import type { BudgetGroup, CreateGroupDto, CreateCategoryDto, UpdateCategoryDto, MonthlyBudget } from '../types';
 
 interface BudgetState {
   currentMonth: Date;
   groups: BudgetGroup[];
   readyToAssign: number;
-  totalIncome: number;
-  totalAllocated: number;
   isLoading: boolean;
   
   // Actions
@@ -24,8 +23,6 @@ export const useBudgetStore = create<BudgetState>((set, get) => ({
   currentMonth: new Date(),
   groups: [],
   readyToAssign: 0,
-  totalIncome: 0,
-  totalAllocated: 0,
   isLoading: false,
   
   setCurrentMonth: (month) => {
@@ -37,12 +34,10 @@ export const useBudgetStore = create<BudgetState>((set, get) => ({
     const targetMonth = month || get().currentMonth;
     set({ isLoading: true });
     try {
-      const budget = await budgetService.getMonthlyBudget(targetMonth);
+      const budget: MonthlyBudget = await budgetService.getMonthlyBudget(targetMonth);
       set({
         groups: budget.groups,
         readyToAssign: budget.readyToAssign,
-        totalIncome: budget.totalIncome,
-        totalAllocated: budget.totalAllocated,
         currentMonth: targetMonth,
         isLoading: false,
       });

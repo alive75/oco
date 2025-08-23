@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { useAuthStore } from '@/stores/auth.store';
+import { useAuthStore } from './stores/auth.store';
 
 function App() {
   const location = useLocation();

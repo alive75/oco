@@ -1,12 +1,5 @@
-import api from './api';
-import { Transaction } from './transaction.service';
-
-export interface SharedBalance {
-  user1Paid: number;
-  user2Paid: number;
-  owedBy: number | null;
-  amount: number;
-}
+import { api } from './api';
+import type { SharedBalance, SharedTransaction } from '../types';
 
 export const sharedService = {
   async getMonthlyBalance(month: Date): Promise<SharedBalance> {
@@ -16,8 +9,8 @@ export const sharedService = {
     return data;
   },
 
-  async getSharedTransactions(month: Date): Promise<Transaction[]> {
-    const { data } = await api.get<Transaction[]>('/shared/transactions', {
+  async getSharedTransactions(month: Date): Promise<SharedTransaction[]> {
+    const { data } = await api.get<SharedTransaction[]>('/shared/transactions', {
       params: { month: month.toISOString() },
     });
     return data;

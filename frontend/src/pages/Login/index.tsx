@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useAuthStore } from '@/stores/auth.store';
+import { useAuthStore } from '../../stores/auth.store';
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),

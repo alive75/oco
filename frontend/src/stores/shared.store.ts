@@ -1,11 +1,11 @@
 import { create } from 'zustand';
-import { sharedService, SharedBalance } from '@/services/shared.service';
-import { Transaction } from '@/services/transaction.service';
+import { sharedService } from '../services/shared.service';
+import type { SharedBalance, SharedTransaction } from '../types';
 
 interface SharedState {
   currentMonth: Date;
   balance: SharedBalance | null;
-  sharedTransactions: Transaction[];
+  sharedTransactions: SharedTransaction[];
   isLoading: boolean;
   
   // Actions

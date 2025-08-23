@@ -1,29 +1,5 @@
-import api from './api';
-
-export enum AccountType {
-  CHECKING = 'CHECKING',
-  CREDIT_CARD = 'CREDIT_CARD',
-  INVESTMENT = 'INVESTMENT',
-}
-
-export interface Account {
-  id: number;
-  name: string;
-  type: AccountType;
-  balance: number;
-  createdAt: string;
-}
-
-export interface CreateAccountDto {
-  name: string;
-  type: AccountType;
-  balance?: number;
-}
-
-export interface UpdateAccountDto {
-  name?: string;
-  balance?: number;
-}
+import { api } from './api';
+import type { Account, CreateAccountDto, UpdateAccountDto } from '../types';
 
 export const accountService = {
   async getAll(): Promise<Account[]> {

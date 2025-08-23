@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { accountService, Account, CreateAccountDto, UpdateAccountDto } from '@/services/account.service';
+import { accountService } from '../services/account.service';
+import type { Account, CreateAccountDto, UpdateAccountDto } from '../types';
 
 interface AccountState {
   accounts: Account[];
@@ -14,7 +15,7 @@ interface AccountState {
   deleteAccount: (id: number) => Promise<void>;
 }
 
-export const useAccountStore = create<AccountState>((set, get) => ({
+export const useAccountStore = create<AccountState>((set) => ({
   accounts: [],
   selectedAccount: null,
   isLoading: false,

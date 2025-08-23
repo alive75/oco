@@ -1,44 +1,5 @@
 import { api } from './api';
-
-export interface Transaction {
-  id: number;
-  date: string;
-  payee: string;
-  amount: number;
-  isShared: boolean;
-  notes?: string;
-  accountId: number;
-  categoryId?: number;
-  paidBy: number;
-  createdAt: string;
-}
-
-export interface CreateTransactionDto {
-  accountId: number;
-  categoryId?: number;
-  date: string;
-  payee: string;
-  amount: number;
-  isShared: boolean;
-  notes?: string;
-}
-
-export interface UpdateTransactionDto {
-  categoryId?: number;
-  date?: string;
-  payee?: string;
-  amount?: number;
-  isShared?: boolean;
-  notes?: string;
-}
-
-export interface TransactionFilters {
-  accountId?: number;
-  categoryId?: number;
-  startDate?: string;
-  endDate?: string;
-  isShared?: boolean;
-}
+import type { CreateTransactionDto, UpdateTransactionDto, TransactionFilters } from '../types';
 
 export const transactionService = {
   async getAll(filters?: TransactionFilters) {

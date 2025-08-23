@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { transactionService, Transaction, CreateTransactionDto, UpdateTransactionDto, TransactionFilters } from '@/services/transaction.service';
+import { transactionService } from '../services/transaction.service';
+import type { Transaction, CreateTransactionDto, UpdateTransactionDto, TransactionFilters } from '../types';
 import { useBudgetStore } from './budget.store';
 
 interface TransactionState {
@@ -79,7 +80,7 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
     }));
 
     // Update budget if transaction had a category
-    if (transaction?.category) {
+    if (transaction?.categoryId) {
       const budgetStore = useBudgetStore.getState();
       budgetStore.loadBudget();
     }
