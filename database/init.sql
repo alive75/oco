@@ -10,6 +10,6 @@ CREATE TABLE IF NOT EXISTS users (
 -- Insert 2 fixed users with hashed passwords (123456)
 -- Password hash for '123456' using bcrypt with salt rounds 10
 INSERT INTO users (email, name, password_hash) VALUES 
-  ('usuario1@oco.app', 'Usuário 1', '$2b$10$K8BQI8rJZ0UZYqzL7Fq4O.Nv8Bg6hJ3YpQqGfK7lHvX9tTwO6mJ8S'),
-  ('usuario2@oco.app', 'Usuário 2', '$2b$10$K8BQI8rJZ0UZYqzL7Fq4O.Nv8Bg6hJ3YpQqGfK7lHvX9tTwO6mJ8S')
+  ('usuario1@oco.app', 'Usuário 1', '$2b$10$b/SKPBLGVzXGEmQofX3TG.hwwzyLoD89VZUQVG6drJ2rzm0X3uQHy'),
+  ('usuario2@oco.app', 'Usuário 2', '$2b$10$b/SKPBLGVzXGEmQofX3TG.hwwzyLoD89VZUQVG6drJ2rzm0X3uQHy')
 ON CONFLICT (email) DO NOTHING;

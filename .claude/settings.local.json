@@ -6,7 +6,15 @@
       "Bash(npm install:*)",
       "Bash(npm create:*)",
       "Bash(npx tailwindcss init:*)",
-      "Bash(npx tailwindcss:*)"
+      "Bash(npx tailwindcss:*)",
+      "Bash(docker restart:*)",
+      "Bash(docker-compose:*)",
+      "Bash(node:*)",
+      "Bash(docker volume rm:*)",
+      "Bash(docker exec:*)",
+      "Bash(PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d oco_db -c \"\\du\")",
+      "Bash(docker logs:*)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []

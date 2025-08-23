@@ -13,7 +13,7 @@ export class User {
   @Column()
   name: string;
 
-  @Column()
+  @Column({ name: 'password_hash' })
   passwordHash: string;
 
   @CreateDateColumn()

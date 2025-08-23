@@ -8,6 +8,7 @@ import { AccountsModule } from './accounts/accounts.module';
 import { BudgetsModule } from './budgets/budgets.module';
 import { TransactionsModule } from './transactions/transactions.module';
 import { SharedModule } from './shared/shared.module';
+import { ReportsModule } from './reports/reports.module';
 
 @Module({
   imports: [
@@ -21,6 +22,10 @@ import { SharedModule } from './shared/shared.module';
       entities: [__dirname + '/**/*.entity{.ts,.js}'],
       synchronize: process.env.NODE_ENV !== 'production',
       logging: process.env.NODE_ENV === 'development',
+      ssl: false,
+      extra: {
+        trustServerCertificate: true,
+      },
     }),
     AuthModule,
     UsersModule,
@@ -28,6 +33,7 @@ import { SharedModule } from './shared/shared.module';
     BudgetsModule,
     TransactionsModule,
     SharedModule,
+    ReportsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

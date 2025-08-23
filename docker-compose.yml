@@ -1,23 +1,55 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:14-alpine
     restart: always
     environment:
       POSTGRES_DB: oco_db
-      POSTGRES_USER: oco_user
-      POSTGRES_PASSWORD: oco_password
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./database/simple-init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U oco_user -d oco_db"]
+      test: ["CMD-SHELL", "PGPASSWORD=postgres pg_isready -U postgres -d oco_db"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - oco-network
+
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      NODE_ENV: development
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USER: oco_user
+      DATABASE_PASSWORD: oco_password
+      DATABASE_NAME: oco_db
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      JWT_EXPIRES_IN: 7d
+      CORS_ORIGIN: http://localhost:5173
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - oco-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  oco-network:
+    driver: bridge
 
 volumes:
   postgres_data:
