@@ -1,7 +1,4 @@
-import api from './api';
-import { Account } from './account.service';
-import { BudgetCategory } from './budget.service';
-import { User } from './auth.service';
+import { api } from './api';
 
 export interface Transaction {
   id: number;
@@ -10,9 +7,9 @@ export interface Transaction {
   amount: number;
   isShared: boolean;
   notes?: string;
-  account: Account;
-  category?: BudgetCategory;
-  paidBy: User;
+  accountId: number;
+  categoryId?: number;
+  paidBy: number;
   createdAt: string;
 }
 
@@ -44,29 +41,42 @@ export interface TransactionFilters {
 }
 
 export const transactionService = {
-  async getAll(filters?: TransactionFilters): Promise<Transaction[]> {
-    const { data } = await api.get<Transaction[]>('/transactions', { 
-      params: filters 
-    });
-    return data;
+  async getAll(filters?: TransactionFilters) {
+    try {
+      const { data } = await api.get('/transactions', { params: filters });
+      return data;
+    } catch (error) {
+      console.error('Erro ao buscar transações:', error);
+      throw error;
+    }
   },
-
-  async getById(id: number): Promise<Transaction> {
-    const { data } = await api.get<Transaction>(`/transactions/${id}`);
-    return data;
+  
+  async create(dto: CreateTransactionDto) {
+    try {
+      const { data } = await api.post('/transactions', dto);
+      return data;
+    } catch (error) {
+      console.error('Erro ao criar transação:', error);
+      throw error;
+    }
   },
-
-  async create(dto: CreateTransactionDto): Promise<Transaction> {
-    const { data } = await api.post<Transaction>('/transactions', dto);
-    return data;
+  
+  async update(id: number, dto: UpdateTransactionDto) {
+    try {
+      const { data } = await api.patch(`/transactions/${id}`, dto);
+      return data;
+    } catch (error) {
+      console.error('Erro ao atualizar transação:', error);
+      throw error;
+    }
   },
-
-  async update(id: number, dto: UpdateTransactionDto): Promise<Transaction> {
-    const { data } = await api.patch<Transaction>(`/transactions/${id}`, dto);
-    return data;
-  },
-
-  async delete(id: number): Promise<void> {
-    await api.delete(`/transactions/${id}`);
-  },
+  
+  async delete(id: number) {
+    try {
+      await api.delete(`/transactions/${id}`);
+    } catch (error) {
+      console.error('Erro ao deletar transação:', error);
+      throw error;
+    }
+  }
 };

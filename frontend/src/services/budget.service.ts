@@ -1,4 +1,4 @@
-import api from './api';
+import { api } from './api';
 
 export interface BudgetCategory {
   id: number;
@@ -39,38 +39,35 @@ export interface UpdateCategoryDto {
 }
 
 export const budgetService = {
-  async getMonthlyBudget(month: Date): Promise<MonthlyBudget> {
-    const { data } = await api.get<MonthlyBudget>('/budgets', {
-      params: { month: month.toISOString() },
-    });
-    return data;
+  async getMonthlyBudget(month: Date) {
+    try {
+      const { data } = await api.get('/budgets', {
+        params: { month: month.toISOString() }
+      });
+      return data;
+    } catch (error) {
+      console.error('Erro ao buscar orçamento mensal:', error);
+      throw error;
+    }
   },
 
-  async createGroup(dto: CreateGroupDto): Promise<BudgetGroup> {
-    const { data } = await api.post<BudgetGroup>('/budgets/groups', dto);
-    return data;
+  async createCategory(dto: CreateCategoryDto) {
+    try {
+      const { data } = await api.post('/budgets/categories', dto);
+      return data;
+    } catch (error) {
+      console.error('Erro ao criar categoria:', error);
+      throw error;
+    }
   },
-
-  async updateGroup(id: number, dto: Partial<CreateGroupDto>): Promise<BudgetGroup> {
-    const { data } = await api.patch<BudgetGroup>(`/budgets/groups/${id}`, dto);
-    return data;
-  },
-
-  async deleteGroup(id: number): Promise<void> {
-    await api.delete(`/budgets/groups/${id}`);
-  },
-
-  async createCategory(dto: CreateCategoryDto): Promise<BudgetCategory> {
-    const { data } = await api.post<BudgetCategory>('/budgets/categories', dto);
-    return data;
-  },
-
-  async updateCategory(id: number, dto: UpdateCategoryDto): Promise<BudgetCategory> {
-    const { data } = await api.patch<BudgetCategory>(`/budgets/categories/${id}`, dto);
-    return data;
-  },
-
-  async deleteCategory(id: number): Promise<void> {
-    await api.delete(`/budgets/categories/${id}`);
-  },
+  
+  async updateCategory(id: number, dto: UpdateCategoryDto) {
+    try {
+      const { data } = await api.patch(`/budgets/categories/${id}`, dto);
+      return data;
+    } catch (error) {
+      console.error('Erro ao atualizar categoria:', error);
+      throw error;
+    }
+  }
 };

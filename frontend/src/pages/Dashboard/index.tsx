@@ -1,28 +1,159 @@
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+
+interface DashboardSummary {
+  readyToAssign: number;
+  totalBalance: number;
+  sharedExpenses: number;
+}
+
+interface RecentTransaction {
+  id: number;
+  date: string;
+  payee: string;
+  amount: number;
+  accountName: string;
+  categoryName?: string;
+}
+
 export default function Dashboard() {
+  const [summary, setSummary] = useState<DashboardSummary>({
+    readyToAssign: 0,
+    totalBalance: 0,
+    sharedExpenses: 0,
+  });
+  const [recentTransactions, setRecentTransactions] = useState<RecentTransaction[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Mock data for now - will connect to API later
+    setTimeout(() => {
+      setSummary({
+        readyToAssign: 2500.00,
+        totalBalance: 15800.50,
+        sharedExpenses: 850.75,
+      });
+      setRecentTransactions([
+        { id: 1, date: '2023-12-15', payee: 'Mercado Central', amount: -125.80, accountName: 'Conta Corrente', categoryName: 'Alimentação' },
+        { id: 2, date: '2023-12-14', payee: 'Posto Shell', amount: -89.90, accountName: 'Cartão Débito', categoryName: 'Transporte' },
+        { id: 3, date: '2023-12-13', payee: 'Netflix', amount: -29.90, accountName: 'Cartão Crédito', categoryName: 'Entretenimento' },
+      ]);
+      setIsLoading(false);
+    }, 1000);
+  }, []);
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(value);
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('pt-BR');
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-700 rounded w-32 mb-6"></div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="bg-gray-800 p-6 rounded-lg">
+                <div className="h-5 bg-gray-700 rounded mb-3"></div>
+                <div className="h-8 bg-gray-700 rounded mb-2"></div>
+                <div className="h-4 bg-gray-700 rounded w-24"></div>
+              </div>
+            ))}
+          </div>
+          <div className="bg-gray-800 p-6 rounded-lg">
+            <div className="h-6 bg-gray-700 rounded w-48 mb-4"></div>
+            <div className="space-y-3">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="h-12 bg-gray-700 rounded"></div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-white">Dashboard</h1>
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold text-white">Dashboard</h1>
+        <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-medium">
+          Nova Transação
+        </button>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-gray-800 p-6 rounded-lg">
-          <h3 className="text-lg font-semibold text-white mb-2">Orçamento do Mês</h3>
-          <div className="text-2xl font-bold text-green-400">R$ 0,00</div>
-          <div className="text-sm text-gray-400">Disponível para alocar</div>
-        </div>
-        <div className="bg-gray-800 p-6 rounded-lg">
+        <Link to="/budget" className="bg-gray-800 p-6 rounded-lg hover:bg-gray-750 transition-colors">
+          <h3 className="text-lg font-semibold text-white mb-2">Pronto para Atribuir</h3>
+          <div className={`text-2xl font-bold ${summary.readyToAssign >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            {formatCurrency(summary.readyToAssign)}
+          </div>
+          <div className="text-sm text-gray-400">Clique para gerenciar orçamento</div>
+        </Link>
+
+        <Link to="/accounts" className="bg-gray-800 p-6 rounded-lg hover:bg-gray-750 transition-colors">
           <h3 className="text-lg font-semibold text-white mb-2">Saldo Total</h3>
-          <div className="text-2xl font-bold text-blue-400">R$ 0,00</div>
+          <div className={`text-2xl font-bold ${summary.totalBalance >= 0 ? 'text-blue-400' : 'text-red-400'}`}>
+            {formatCurrency(summary.totalBalance)}
+          </div>
           <div className="text-sm text-gray-400">Todas as contas</div>
-        </div>
-        <div className="bg-gray-800 p-6 rounded-lg">
+        </Link>
+
+        <Link to="/shared" className="bg-gray-800 p-6 rounded-lg hover:bg-gray-750 transition-colors">
           <h3 className="text-lg font-semibold text-white mb-2">Gastos Compartilhados</h3>
-          <div className="text-2xl font-bold text-yellow-400">R$ 0,00</div>
+          <div className="text-2xl font-bold text-yellow-400">
+            {formatCurrency(summary.sharedExpenses)}
+          </div>
           <div className="text-sm text-gray-400">Este mês</div>
-        </div>
+        </Link>
       </div>
       
       <div className="bg-gray-800 p-6 rounded-lg">
-        <h2 className="text-xl font-semibold text-white mb-4">Transações Recentes</h2>
-        <div className="text-gray-400">Nenhuma transação encontrada</div>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold text-white">Transações Recentes</h2>
+          <Link to="/accounts" className="text-blue-400 hover:text-blue-300 text-sm">
+            Ver todas
+          </Link>
+        </div>
+        
+        {recentTransactions.length === 0 ? (
+          <div className="text-center py-8 text-gray-400">
+            <p>Nenhuma transação encontrada</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {recentTransactions.map((transaction) => (
+              <div key={transaction.id} className="flex items-center justify-between p-3 bg-gray-700 rounded-md">
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-white font-medium">{transaction.payee}</span>
+                    <span className={`font-semibold ${transaction.amount < 0 ? 'text-red-400' : 'text-green-400'}`}>
+                      {formatCurrency(Math.abs(transaction.amount))}
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2 text-sm text-gray-400 mt-1">
+                    <span>{formatDate(transaction.date)}</span>
+                    <span>•</span>
+                    <span>{transaction.accountName}</span>
+                    {transaction.categoryName && (
+                      <>
+                        <span>•</span>
+                        <span>{transaction.categoryName}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

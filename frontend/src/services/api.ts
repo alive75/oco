@@ -1,41 +1,24 @@
 import axios from 'axios';
+import { useAuthStore } from '@/stores/auth.store';
 
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000',
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000'
 });
 
-// Request interceptor to add JWT token
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('auth-token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
+api.interceptors.request.use(config => {
+  const token = useAuthStore.getState().token;
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
 
-// Response interceptor to handle auth errors
 api.interceptors.response.use(
-  (response) => response,
-  (error) => {
+  response => response,
+  error => {
     if (error.response?.status === 401) {
-      // Token expired or invalid
-      localStorage.removeItem('auth-token');
-      localStorage.removeItem('auth-user');
+      useAuthStore.getState().logout();
       window.location.href = '/login';
     }
-    
-    // Return a more user-friendly error message
-    const message = error.response?.data?.message || 'Erro na requisição';
-    return Promise.reject(new Error(message));
+    return Promise.reject(error);
   }
 );
 

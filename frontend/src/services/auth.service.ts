@@ -1,39 +1,14 @@
-import api from './api';
-
-export interface LoginDto {
-  email: string;
-  password: string;
-}
-
-export interface LoginResponse {
-  access_token: string;
-  user: {
-    id: number;
-    email: string;
-    name: string;
-  };
-}
-
-export interface User {
-  id: number;
-  email: string;
-  name: string;
-}
+import { api } from './api';
+import { LoginDto, LoginResponse, User } from '@/types';
 
 export const authService = {
-  async login(credentials: LoginDto): Promise<LoginResponse> {
-    const { data } = await api.post<LoginResponse>('/auth/login', credentials);
+  async login(credentials: LoginDto) {
+    const { data } = await api.post('/auth/login', credentials);
     return data;
   },
-
-  async getProfile(): Promise<User> {
-    const { data } = await api.get<User>('/auth/profile');
+  
+  async getProfile() {
+    const { data } = await api.get('/auth/profile');
     return data;
-  },
-
-  logout(): void {
-    localStorage.removeItem('auth-token');
-    localStorage.removeItem('auth-user');
-    window.location.href = '/login';
-  },
+  }
 };
