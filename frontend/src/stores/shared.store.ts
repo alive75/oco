@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { sharedService } from '../services/shared.service';
 import type { SharedBalance, SharedTransaction } from '../types';
 
@@ -16,7 +17,9 @@ interface SharedState {
   settle: (month?: Date) => Promise<void>;
 }
 
-export const useSharedStore = create<SharedState>((set, get) => ({
+export const useSharedStore = create<SharedState>()(
+  persist(
+    (set, get) => ({
   currentMonth: new Date(),
   balance: null,
   sharedTransactions: [],
@@ -63,4 +66,11 @@ export const useSharedStore = create<SharedState>((set, get) => ({
     // Reload data after settling
     get().loadMonthlyData(targetMonth);
   },
-}));
+    }),
+    {
+      name: 'shared-preferences',
+      // Only persist currentMonth
+      partialize: (state) => ({ currentMonth: state.currentMonth }),
+    }
+  )
+);

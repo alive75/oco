@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useBudgetStore } from '../../stores/budget.store';
 import { formatCurrency } from '../../utils/currency';
+import { BudgetSkeleton } from '../../components/Skeleton';
 import { 
   ChevronLeft as ChevronLeftIcon, 
   ChevronRight as ChevronRightIcon, 
@@ -127,11 +128,7 @@ export default function Budget() {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-400">Carregando orçamento...</div>
-      </div>
-    );
+    return <BudgetSkeleton />;
   }
 
   return (
@@ -140,7 +137,7 @@ export default function Budget() {
       <div className="flex items-center justify-between mb-6">
         <button
           onClick={() => navigateMonth('prev')}
-          className="p-2 text-gray-400 hover:text-white rounded-md hover:bg-gray-700"
+          className="p-2 text-gray-400 hover:text-white rounded-md hover:bg-gray-700 transition-colors duration-200"
         >
           <ChevronLeftIcon className="h-5 w-5" />
         </button>
@@ -151,7 +148,7 @@ export default function Budget() {
         
         <button
           onClick={() => navigateMonth('next')}
-          className="p-2 text-gray-400 hover:text-white rounded-md hover:bg-gray-700"
+          className="p-2 text-gray-400 hover:text-white rounded-md hover:bg-gray-700 transition-colors duration-200"
         >
           <ChevronRightIcon className="h-5 w-5" />
         </button>
@@ -182,7 +179,7 @@ export default function Budget() {
           <div key={group.id} className="bg-gray-800 rounded-lg overflow-hidden">
             {/* Header do Grupo */}
             <div
-              className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-700"
+              className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-700 transition-colors duration-200"
               onClick={() => toggleGroup(group.id)}
             >
               <div className="flex items-center space-x-3">
@@ -210,7 +207,7 @@ export default function Budget() {
 
             {/* Lista de Categorias (expandível) */}
             {expandedGroups.has(group.id) && (
-              <div className="border-t border-gray-700">
+              <div className="border-t border-gray-700 animate-in slide-in-from-top-2 duration-300">
                 <div className="p-4 space-y-3">
                   {group.categories.map((category) => (
                     <div
@@ -279,7 +276,7 @@ export default function Budget() {
                         ) : (
                           <button
                             onClick={() => handleCategoryEdit(category.id, category.allocated_amount)}
-                            className="text-right hover:bg-gray-600 px-2 py-1 rounded"
+                            className="text-right hover:bg-gray-600 px-2 py-1 rounded transition-colors duration-200"
                           >
                             <div className="text-white font-semibold">
                               {formatCurrency(category.allocated_amount)}
@@ -334,7 +331,7 @@ export default function Budget() {
                   ) : (
                     <button
                       onClick={() => setShowCreateCategory(group.id)}
-                      className="flex items-center justify-center py-3 px-4 bg-gray-700 rounded-lg border-2 border-dashed border-gray-500 hover:border-gray-400 text-gray-400 hover:text-gray-300"
+                      className="flex items-center justify-center py-3 px-4 bg-gray-700 rounded-lg border-2 border-dashed border-gray-500 hover:border-gray-400 text-gray-400 hover:text-gray-300 transition-all duration-200"
                     >
                       <PlusIcon className="h-4 w-4 mr-2" />
                       Adicionar Categoria
@@ -381,7 +378,7 @@ export default function Budget() {
         ) : (
           <button
             onClick={() => setShowCreateGroup(true)}
-            className="w-full flex items-center justify-center py-4 bg-gray-800 rounded-lg border-2 border-dashed border-gray-600 hover:border-gray-500 text-gray-400 hover:text-gray-300"
+            className="w-full flex items-center justify-center py-4 bg-gray-800 rounded-lg border-2 border-dashed border-gray-600 hover:border-gray-500 text-gray-400 hover:text-gray-300 transition-all duration-200"
           >
             <PlusIcon className="h-5 w-5 mr-2" />
             Adicionar Grupo

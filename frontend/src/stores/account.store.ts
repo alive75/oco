@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { accountService } from '../services/account.service';
+import { cache, cacheKeys } from '../utils/cache';
 import type { Account, CreateAccountDto, UpdateAccountDto } from '../types';
 
 interface AccountState {
@@ -21,9 +22,22 @@ export const useAccountStore = create<AccountState>((set) => ({
   isLoading: false,
   
   loadAccounts: async () => {
+    const cacheKey = cacheKeys.accounts();
+    
+    // Check cache first
+    const cachedAccounts = cache.get<Account[]>(cacheKey);
+    if (cachedAccounts) {
+      set({ accounts: cachedAccounts, isLoading: false });
+      return;
+    }
+
     set({ isLoading: true });
     try {
       const accounts = await accountService.getAll();
+      
+      // Cache for 3 minutes (accounts don't change as frequently)
+      cache.set(cacheKey, accounts, 3);
+      
       set({ accounts, isLoading: false });
     } catch (error) {
       set({ isLoading: false });
@@ -37,6 +51,8 @@ export const useAccountStore = create<AccountState>((set) => ({
   
   createAccount: async (dto) => {
     const newAccount = await accountService.create(dto);
+    // Invalidate cache
+    cache.invalidate(cacheKeys.accounts());
     set((state) => ({
       accounts: [...state.accounts, newAccount],
     }));
@@ -44,6 +60,8 @@ export const useAccountStore = create<AccountState>((set) => ({
   
   updateAccount: async (id, dto) => {
     const updatedAccount = await accountService.update(id, dto);
+    // Invalidate cache
+    cache.invalidate(cacheKeys.accounts());
     set((state) => ({
       accounts: state.accounts.map((account) =>
         account.id === id ? updatedAccount : account
@@ -54,6 +72,8 @@ export const useAccountStore = create<AccountState>((set) => ({
   
   deleteAccount: async (id) => {
     await accountService.delete(id);
+    // Invalidate cache
+    cache.invalidate(cacheKeys.accounts());
     set((state) => ({
       accounts: state.accounts.filter((account) => account.id !== id),
       selectedAccount: state.selectedAccount?.id === id ? null : state.selectedAccount,

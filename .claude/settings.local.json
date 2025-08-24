@@ -18,7 +18,10 @@
       "Bash(npx shadcn-ui@latest add:*)",
       "Bash(npx shadcn@latest add:*)",
       "Bash(npm run build:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(npm run start:dev:*)",
+      "Bash(chmod:*)"
     ],
     "deny": [],
     "ask": []

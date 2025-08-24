@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
 import { useSharedStore } from '../../stores/shared.store';
 import { formatCurrency } from '../../utils/currency';
+import { SharedSkeleton } from '../../components/Skeleton';
+import { NoSharedExpenses } from '../../components/EmptyStates';
 import { 
   ChevronLeft as ChevronLeftIcon, 
   ChevronRight as ChevronRightIcon,
@@ -84,11 +86,7 @@ export default function Shared() {
   const debtInfo = getDebtorInfo();
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-400">Carregando dados compartilhados...</div>
-      </div>
-    );
+    return <SharedSkeleton />;
   }
 
   return (
@@ -97,7 +95,7 @@ export default function Shared() {
       <div className="flex items-center justify-between mb-6">
         <button
           onClick={() => navigateMonth('prev')}
-          className="p-2 text-gray-400 hover:text-white rounded-md hover:bg-gray-700"
+          className="p-2 text-gray-400 hover:text-white rounded-md hover:bg-gray-700 transition-colors duration-200"
         >
           <ChevronLeftIcon className="h-5 w-5" />
         </button>
@@ -108,7 +106,7 @@ export default function Shared() {
         
         <button
           onClick={() => navigateMonth('next')}
-          className="p-2 text-gray-400 hover:text-white rounded-md hover:bg-gray-700"
+          className="p-2 text-gray-400 hover:text-white rounded-md hover:bg-gray-700 transition-colors duration-200"
         >
           <ChevronRightIcon className="h-5 w-5" />
         </button>
@@ -181,7 +179,7 @@ export default function Shared() {
               {!balance?.isBalanced && balance?.amount && (
                 <button
                   onClick={handleSettle}
-                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium"
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors duration-200"
                 >
                   Marcar como Quitado
                 </button>
@@ -255,7 +253,7 @@ export default function Shared() {
         <div className="divide-y divide-gray-700">
           {sharedTransactions.length > 0 ? (
             sharedTransactions.map((transaction) => (
-              <div key={transaction.id} className="p-6 hover:bg-gray-700">
+              <div key={transaction.id} className="p-6 hover:bg-gray-700 transition-colors duration-200">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-4">
                     <div className="flex flex-col">
@@ -304,17 +302,7 @@ export default function Shared() {
               </div>
             ))
           ) : (
-            <div className="p-12 text-center">
-              <div className="text-gray-400 mb-4">
-                <UserIcon className="h-12 w-12 mx-auto mb-4" />
-                <h4 className="text-lg font-medium text-gray-300 mb-2">
-                  Nenhuma despesa compartilhada
-                </h4>
-                <p className="text-gray-400">
-                  As transações marcadas como "compartilhadas" aparecerão aqui
-                </p>
-              </div>
-            </div>
+            <NoSharedExpenses />
           )}
         </div>
       </div>

@@ -214,39 +214,68 @@ export class TransactionsService {
       
       // Buscar a categoria da transação
       const sourceCategory = await budgetCategoryRepository.findOne({
-        where: { id: categoryId }
+        where: { id: categoryId },
+        relations: ['group']
       });
       
       if (!sourceCategory) {
-        return; // Categoria não encontrada, não fazer nada
-      }
-
-      // Buscar categoria de pagamento do cartão (baseada no nome da conta)
-      const paymentCategoryName = `Pagamento ${account.name}`;
-      const paymentCategory = await budgetCategoryRepository.findOne({
-        where: { name: paymentCategoryName }
-      });
-
-      if (!paymentCategory) {
-        console.warn(`Categoria de pagamento não encontrada: ${paymentCategoryName}`);
+        console.warn(`Categoria de origem não encontrada: ${categoryId}`);
         return;
       }
 
-      // Deduzir valor da categoria original e adicionar na categoria do cartão
-      const newSourceAmount = Number(sourceCategory.allocatedAmount) - amount;
-      const newPaymentAmount = Number(paymentCategory.allocatedAmount) + amount;
+      // Validar se há valor suficiente na categoria de origem
+      const currentSourceAmount = Number(sourceCategory.allocatedAmount);
+      if (currentSourceAmount < amount) {
+        console.warn(`Valor insuficiente na categoria ${sourceCategory.name}. Disponível: ${currentSourceAmount}, Necessário: ${amount}`);
+        // Continue but only deduce available amount
+        amount = currentSourceAmount;
+      }
 
-      // Atualizar as categorias
-      await budgetCategoryRepository.update(sourceCategory.id, { 
-        allocatedAmount: Math.max(0, newSourceAmount) // Não permitir negativo
+      // Buscar categoria de pagamento do cartão (múltiplos padrões possíveis)
+      const possibleNames = [
+        `Pagamento ${account.name}`,
+        `${account.name}`,
+        account.name.includes('Cartão') ? account.name : `Cartão ${account.name}`
+      ];
+
+      let paymentCategory = null;
+      for (const possibleName of possibleNames) {
+        paymentCategory = await budgetCategoryRepository.findOne({
+          where: { 
+            name: possibleName,
+            group: { monthYear: sourceCategory.group.monthYear } // Mesmo mês
+          },
+          relations: ['group']
+        });
+        if (paymentCategory) break;
+      }
+
+      if (!paymentCategory) {
+        console.warn(`Categoria de pagamento não encontrada para ${account.name}. Tentativas: ${possibleNames.join(', ')}`);
+        return;
+      }
+
+      // Atualizar categorias com transação atômica
+      await budgetCategoryRepository.manager.transaction(async (transactionalEntityManager) => {
+        // Deduzir valor da categoria original
+        const newSourceAmount = Math.max(0, currentSourceAmount - amount);
+        await transactionalEntityManager.update(BudgetCategory, sourceCategory.id, { 
+          allocatedAmount: newSourceAmount
+        });
+        
+        // Adicionar valor à categoria de pagamento do cartão
+        const currentPaymentAmount = Number(paymentCategory.allocatedAmount);
+        const newPaymentAmount = currentPaymentAmount + amount;
+        await transactionalEntityManager.update(BudgetCategory, paymentCategory.id, { 
+          allocatedAmount: newPaymentAmount
+        });
       });
-      
-      await budgetCategoryRepository.update(paymentCategory.id, { 
-        allocatedAmount: newPaymentAmount
-      });
+
+      console.log(`Transferência de orçamento: ${sourceCategory.name} (${currentSourceAmount} -> ${currentSourceAmount - amount}) para ${paymentCategory.name} (${Number(paymentCategory.allocatedAmount)} -> ${Number(paymentCategory.allocatedAmount) + amount})`);
 
     } catch (error) {
       console.error('Erro ao processar transação de cartão de crédito:', error);
+      // Não lançar erro para não impedir a transação principal
     }
   }
 

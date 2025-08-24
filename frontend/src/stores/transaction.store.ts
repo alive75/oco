@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { transactionService } from '../services/transaction.service';
 import type { Transaction, CreateTransactionDto, UpdateTransactionDto, TransactionFilters } from '../types';
 import { useBudgetStore } from './budget.store';
@@ -17,7 +18,9 @@ interface TransactionState {
   clearFilters: () => void;
 }
 
-export const useTransactionStore = create<TransactionState>((set, get) => ({
+export const useTransactionStore = create<TransactionState>()(
+  persist(
+    (set, get) => ({
   transactions: [],
   filters: {},
   isLoading: false,
@@ -85,4 +88,11 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
       budgetStore.loadBudget();
     }
   },
-}));
+    }),
+    {
+      name: 'transaction-filters',
+      // Only persist filters, not transactions or loading state
+      partialize: (state) => ({ filters: state.filters }),
+    }
+  )
+);

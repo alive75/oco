@@ -1,5 +1,7 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { budgetService } from '../services/budget.service';
+import { cache, cacheKeys } from '../utils/cache';
 import type { BudgetGroup, CreateGroupDto, CreateCategoryDto, UpdateCategoryDto, MonthlyBudget } from '../types';
 
 interface BudgetState {
@@ -19,7 +21,9 @@ interface BudgetState {
   deleteCategory: (id: number) => Promise<void>;
 }
 
-export const useBudgetStore = create<BudgetState>((set, get) => ({
+export const useBudgetStore = create<BudgetState>()(
+  persist(
+    (set, get) => ({
   currentMonth: new Date(),
   groups: [],
   readyToAssign: 0,
@@ -32,9 +36,27 @@ export const useBudgetStore = create<BudgetState>((set, get) => ({
   
   loadBudget: async (month) => {
     const targetMonth = month || get().currentMonth;
+    const cacheKey = cacheKeys.budget(targetMonth);
+    
+    // Check cache first
+    const cachedBudget = cache.get<MonthlyBudget>(cacheKey);
+    if (cachedBudget) {
+      set({
+        groups: cachedBudget.groups,
+        readyToAssign: cachedBudget.readyToAssign,
+        currentMonth: targetMonth,
+        isLoading: false,
+      });
+      return;
+    }
+
     set({ isLoading: true });
     try {
       const budget: MonthlyBudget = await budgetService.getMonthlyBudget(targetMonth);
+      
+      // Cache the result for 5 minutes
+      cache.set(cacheKey, budget, 5);
+      
       set({
         groups: budget.groups,
         readyToAssign: budget.readyToAssign,
@@ -49,32 +71,51 @@ export const useBudgetStore = create<BudgetState>((set, get) => ({
   
   updateCategory: async (categoryId, dto) => {
     await budgetService.updateCategory(categoryId, dto);
-    // Reload budget to get updated calculations
+    // Invalidate cache and reload budget
+    const currentMonth = get().currentMonth;
+    cache.invalidate(cacheKeys.budget(currentMonth));
     get().loadBudget();
   },
   
   createGroup: async (dto) => {
     await budgetService.createGroup(dto);
+    const currentMonth = get().currentMonth;
+    cache.invalidate(cacheKeys.budget(currentMonth));
     get().loadBudget();
   },
 
   updateGroup: async (id, dto) => {
     await budgetService.updateGroup(id, dto);
+    const currentMonth = get().currentMonth;
+    cache.invalidate(cacheKeys.budget(currentMonth));
     get().loadBudget();
   },
 
   deleteGroup: async (id) => {
     await budgetService.deleteGroup(id);
+    const currentMonth = get().currentMonth;
+    cache.invalidate(cacheKeys.budget(currentMonth));
     get().loadBudget();
   },
   
   createCategory: async (dto) => {
     await budgetService.createCategory(dto);
+    const currentMonth = get().currentMonth;
+    cache.invalidate(cacheKeys.budget(currentMonth));
     get().loadBudget();
   },
 
   deleteCategory: async (id) => {
     await budgetService.deleteCategory(id);
+    const currentMonth = get().currentMonth;
+    cache.invalidate(cacheKeys.budget(currentMonth));
     get().loadBudget();
   },
-}));
+    }),
+    {
+      name: 'budget-preferences',
+      // Only persist currentMonth
+      partialize: (state) => ({ currentMonth: state.currentMonth }),
+    }
+  )
+);
