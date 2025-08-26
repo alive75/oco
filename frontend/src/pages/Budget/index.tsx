@@ -37,7 +37,8 @@ export default function Budget() {
   }, [loadBudget, currentMonth]);
 
   const formatMonthYear = (date: Date) => {
-    return date.toLocaleDateString('pt-BR', { 
+    const validDate = new Date(date);
+    return validDate.toLocaleDateString('pt-BR', { 
       month: 'long', 
       year: 'numeric' 
     });
@@ -71,7 +72,7 @@ export default function Budget() {
   const saveCategoryAmount = async (categoryId: number) => {
     try {
       const amount = parseFloat(categoryValue) || 0;
-      await updateCategory(categoryId, { allocated_amount: amount });
+      await updateCategory(categoryId, { allocatedAmount: amount });
       setEditingCategory(null);
     } catch (error) {
       console.error('Erro ao salvar categoria:', error);
@@ -87,9 +88,10 @@ export default function Budget() {
     if (!newGroupName.trim()) return;
     
     try {
+      const validDate = new Date(currentMonth);
       await createGroup({
         name: newGroupName,
-        month_year: currentMonth.toISOString().slice(0, 7) // YYYY-MM format
+        monthYear: validDate.toISOString().slice(0, 10) // YYYY-MM-DD format
       });
       setNewGroupName('');
       setShowCreateGroup(false);
@@ -105,8 +107,8 @@ export default function Budget() {
       const amount = parseFloat(newCategoryAmount) || 0;
       await createCategory({
         name: newCategoryName,
-        allocated_amount: amount,
-        group_id: groupId
+        allocatedAmount: amount,
+        groupId: groupId
       });
       setNewCategoryName('');
       setNewCategoryAmount('');
@@ -199,7 +201,7 @@ export default function Budget() {
               </div>
               <div className="text-right">
                 <div className="text-lg font-semibold text-white">
-                  {formatCurrency(group.total_allocated)}
+                  {formatCurrency(group.totalAllocated)}
                 </div>
                 <div className="text-sm text-gray-400">Total alocado</div>
               </div>
@@ -223,17 +225,17 @@ export default function Budget() {
                         <div className="mt-2">
                           <div className="flex items-center justify-between text-sm text-gray-400 mb-1">
                             <span>Gasto: {formatCurrency(category.spent)}</span>
-                            <span>Alocado: {formatCurrency(category.allocated_amount)}</span>
+                            <span>Alocado: {formatCurrency(category.allocatedAmount)}</span>
                           </div>
                           <div className="w-full bg-gray-600 rounded-full h-2">
                             <div
                               className={`h-2 rounded-full transition-all ${
-                                getProgressColor(category.spent, category.allocated_amount)
+                                getProgressColor(category.spent, category.allocatedAmount)
                               }`}
                               style={{
                                 width: `${getProgressPercentage(
                                   category.spent,
-                                  category.allocated_amount
+                                  category.allocatedAmount
                                 )}%`
                               }}
                             ></div>
@@ -275,11 +277,11 @@ export default function Budget() {
                           </div>
                         ) : (
                           <button
-                            onClick={() => handleCategoryEdit(category.id, category.allocated_amount)}
+                            onClick={() => handleCategoryEdit(category.id, category.allocatedAmount)}
                             className="text-right hover:bg-gray-600 px-2 py-1 rounded transition-colors duration-200"
                           >
                             <div className="text-white font-semibold">
-                              {formatCurrency(category.allocated_amount)}
+                              {formatCurrency(category.allocatedAmount)}
                             </div>
                           </button>
                         )}

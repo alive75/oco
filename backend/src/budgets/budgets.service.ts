@@ -20,13 +20,18 @@ export class BudgetsService {
   async getMonthlyBudget(month: Date) {
     const groups = await this.findGroupsByMonth(month);
     
-    // Calcular valores gastos e disponíveis por categoria
+    // Calcular valores gastos e disponíveis por categoria, e total alocado por grupo
     for (const group of groups) {
+      let totalAllocated = 0;
+      
       for (const category of group.categories) {
         const spent = await this.getCategorySpent(category.id, month);
         (category as any).spent = spent;
         (category as any).available = Number(category.allocatedAmount) - spent;
+        totalAllocated += Number(category.allocatedAmount);
       }
+      
+      (group as any).totalAllocated = totalAllocated;
     }
 
     const readyToAssign = await this.getReadyToAssign(month);

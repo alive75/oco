@@ -12,8 +12,8 @@ export interface SharedTransaction {
   date: Date;
   payee: string;
   notes?: string;
-  paid_by_user_id: number;
-  individual_amount: number;
+  paidByUserId: number;
+  individualAmount: number;
   user: {
     name: string;
   };

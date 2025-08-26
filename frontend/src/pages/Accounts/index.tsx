@@ -21,24 +21,30 @@ import {
   Trash as TrashIcon,
   Search as SearchIcon
 } from 'lucide-react';
-import type { Account, CreateTransactionDto } from '../../types';
+import type { Account, CreateTransactionDto, CreateAccountDto } from '../../types';
 
 export default function Accounts() {
   // const { user } = useAuthStore();
-  const { accounts, selectedAccount, isLoading: accountsLoading, loadAccounts, selectAccount } = useAccountStore();
+  const { accounts, selectedAccount, isLoading: accountsLoading, loadAccounts, selectAccount, createAccount } = useAccountStore();
   const { transactions, isLoading: transactionsLoading, loadTransactions, addTransaction, deleteTransaction } = useTransactionStore();
   const { groups } = useBudgetStore();
   
   const [showTransactionForm, setShowTransactionForm] = useState(false);
+  const [showAccountForm, setShowAccountForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   // const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [transactionForm, setTransactionForm] = useState<CreateTransactionDto>({
-    account_id: 0,
+    accountId: 0,
     amount: 0,
     date: new Date(),
     payee: '',
-    is_shared: false,
+    isShared: false,
     notes: ''
+  });
+  const [accountForm, setAccountForm] = useState<CreateAccountDto>({
+    name: '',
+    type: 'CHECKING',
+    balance: 0
   });
 
   useEffect(() => {
@@ -47,7 +53,7 @@ export default function Accounts() {
 
   useEffect(() => {
     if (selectedAccount) {
-      loadTransactions({ account_id: selectedAccount.id });
+      loadTransactions({ accountId: selectedAccount.id });
     }
   }, [selectedAccount, loadTransactions]);
 
@@ -82,11 +88,11 @@ export default function Accounts() {
     if (!targetAccount) return;
     
     setTransactionForm({
-      account_id: targetAccount.id,
+      accountId: targetAccount.id,
       amount: 0,
       date: new Date(),
       payee: '',
-      is_shared: false,
+      isShared: false,
       notes: ''
     });
     // setEditingTransaction(null);
@@ -162,6 +168,28 @@ export default function Accounts() {
     }
   };
 
+  const handleAccountSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!accountForm.name.trim()) {
+      alert('O nome da conta é obrigatório');
+      return;
+    }
+    
+    try {
+      await createAccount(accountForm);
+      setShowAccountForm(false);
+      setAccountForm({
+        name: '',
+        type: 'CHECKING',
+        balance: 0
+      });
+    } catch (error) {
+      console.error('Erro ao criar conta:', error);
+      alert('Erro ao criar conta. Tente novamente.');
+    }
+  };
+
   const formatTransactionDate = (date: Date) => {
     return new Date(date).toLocaleDateString('pt-BR');
   };
@@ -208,14 +236,23 @@ export default function Accounts() {
     <div className="max-w-6xl mx-auto p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-white">Contas</h1>
-        <button
-          onClick={() => openTransactionForm()}
-          disabled={!selectedAccount}
-          className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white rounded-lg transition-colors duration-200"
-        >
-          <PlusIcon className="h-4 w-4" />
-          <span>Nova Transação</span>
-        </button>
+        <div className="flex space-x-3">
+          <button
+            onClick={() => setShowAccountForm(true)}
+            className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-200"
+          >
+            <PlusIcon className="h-4 w-4" />
+            <span>Nova Conta</span>
+          </button>
+          <button
+            onClick={() => openTransactionForm()}
+            disabled={!selectedAccount}
+            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white rounded-lg transition-colors duration-200"
+          >
+            <PlusIcon className="h-4 w-4" />
+            <span>Nova Transação</span>
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -257,7 +294,7 @@ export default function Accounts() {
           ))}
 
           {accounts.length === 0 && (
-            <NoAccounts onAddAccount={() => console.log('Adicionar conta')} />
+            <NoAccounts onAddAccount={() => setShowAccountForm(true)} />
           )}
         </div>
 
@@ -329,7 +366,7 @@ export default function Accounts() {
                             <div className="flex flex-col">
                               <div className="flex items-center space-x-2 text-white font-medium">
                                 <span>{transaction.payee}</span>
-                                {transaction.is_shared && (
+                                {transaction.isShared && (
                                   <span className="px-2 py-1 bg-blue-600 text-xs rounded">
                                     Compartilhada
                                   </span>
@@ -503,10 +540,10 @@ export default function Accounts() {
                 <label className="flex items-center space-x-2 text-sm text-gray-300">
                   <input
                     type="checkbox"
-                    checked={transactionForm.is_shared}
+                    checked={transactionForm.isShared}
                     onChange={(e) => setTransactionForm({
                       ...transactionForm,
-                      is_shared: e.target.checked
+                      isShared: e.target.checked
                     })}
                     className="rounded bg-gray-700 border-gray-600"
                   />
@@ -545,6 +582,96 @@ export default function Accounts() {
                   className="flex-1 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded font-medium transition-colors duration-200"
                 >
                   Cancelar <span className="text-xs opacity-70">(Esc)</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Formulário de Conta */}
+      {showAccountForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md animate-in zoom-in-95 duration-300">
+            <h3 className="text-lg font-semibold text-white mb-4">
+              Nova Conta
+            </h3>
+            
+            <form onSubmit={handleAccountSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Nome da Conta
+                </label>
+                <input
+                  type="text"
+                  value={accountForm.name}
+                  onChange={(e) => setAccountForm({
+                    ...accountForm,
+                    name: e.target.value
+                  })}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Ex: Conta Corrente Principal, Cartão Nubank..."
+                  maxLength={100}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Tipo da Conta
+                </label>
+                <select
+                  value={accountForm.type}
+                  onChange={(e) => setAccountForm({
+                    ...accountForm,
+                    type: e.target.value as 'CHECKING' | 'CREDIT_CARD' | 'INVESTMENT'
+                  })}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  required
+                >
+                  <option value="CHECKING">Conta Corrente</option>
+                  <option value="CREDIT_CARD">Cartão de Crédito</option>
+                  <option value="INVESTMENT">Investimento</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Saldo Inicial (R$)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={accountForm.balance}
+                  onChange={(e) => setAccountForm({
+                    ...accountForm,
+                    balance: parseFloat(e.target.value) || 0
+                  })}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="0,00"
+                />
+              </div>
+
+              <div className="flex space-x-3 pt-4">
+                <button
+                  type="submit"
+                  className="flex-1 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-medium transition-colors duration-200"
+                >
+                  Criar Conta
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAccountForm(false);
+                    setAccountForm({
+                      name: '',
+                      type: 'CHECKING',
+                      balance: 0
+                    });
+                  }}
+                  className="flex-1 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded font-medium transition-colors duration-200"
+                >
+                  Cancelar
                 </button>
               </div>
             </form>

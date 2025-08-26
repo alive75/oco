@@ -4,8 +4,9 @@ import type { CreateGroupDto, CreateCategoryDto, UpdateCategoryDto, UpdateGroupD
 export const budgetService = {
   async getMonthlyBudget(month: Date) {
     try {
+      const validDate = new Date(month);
       const { data } = await api.get('/budgets', {
-        params: { month: month.toISOString() }
+        params: { month: validDate.toISOString() }
       });
       return data;
     } catch (error) {

@@ -1,4 +1,11 @@
-export function formatCurrency(amount: number): string {
+export function formatCurrency(amount: number | undefined | null): string {
+  if (amount === undefined || amount === null || isNaN(amount)) {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(0);
+  }
+  
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL'

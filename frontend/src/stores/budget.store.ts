@@ -54,11 +54,25 @@ export const useBudgetStore = create<BudgetState>()(
     try {
       const budget: MonthlyBudget = await budgetService.getMonthlyBudget(targetMonth);
       
+      // Calculate totalAllocated for each group if missing from backend
+      const processedGroups = budget.groups.map(group => {
+        if (!group.totalAllocated && group.totalAllocated !== 0) {
+          const totalAllocated = group.categories.reduce((sum, category) => {
+            const amount = typeof category.allocatedAmount === 'string' 
+              ? parseFloat(category.allocatedAmount) 
+              : category.allocatedAmount;
+            return sum + (isNaN(amount) ? 0 : amount);
+          }, 0);
+          return { ...group, totalAllocated };
+        }
+        return group;
+      });
+      
       // Cache the result for 5 minutes
       cache.set(cacheKey, budget, 5);
       
       set({
-        groups: budget.groups,
+        groups: processedGroups,
         readyToAssign: budget.readyToAssign,
         currentMonth: targetMonth,
         isLoading: false,

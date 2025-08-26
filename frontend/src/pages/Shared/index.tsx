@@ -30,7 +30,8 @@ export default function Shared() {
   }, [loadMonthlyData, currentMonth]);
 
   const formatMonthYear = (date: Date) => {
-    return date.toLocaleDateString('pt-BR', { 
+    const validDate = new Date(date);
+    return validDate.toLocaleDateString('pt-BR', { 
       month: 'long', 
       year: 'numeric' 
     });
@@ -260,7 +261,7 @@ export default function Shared() {
                       <div className="flex items-center space-x-2 text-white font-medium">
                         <span>{transaction.payee}</span>
                         <span className={`px-2 py-1 text-xs rounded ${
-                          transaction.paid_by_user_id === 1 
+                          transaction.paidByUserId === 1 
                             ? 'bg-blue-600 text-blue-100' 
                             : 'bg-green-600 text-green-100'
                         }`}>
@@ -295,7 +296,7 @@ export default function Shared() {
                       {formatCurrency(transaction.amount)}
                     </div>
                     <div className="text-sm text-gray-400">
-                      {formatCurrency(transaction.individual_amount)} por pessoa
+                      {formatCurrency(transaction.individualAmount)} por pessoa
                     </div>
                   </div>
                 </div>

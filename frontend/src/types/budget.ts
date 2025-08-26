@@ -1,18 +1,18 @@
 export interface BudgetCategory {
   id: number;
   name: string;
-  allocated_amount: number;
+  allocatedAmount: number;
   spent: number;
   available: number;
-  group_id: number;
+  groupId: number;
 }
 
 export interface BudgetGroup {
   id: number;
   name: string;
-  month_year: string;
+  monthYear: string;
   categories: BudgetCategory[];
-  total_allocated: number;
+  totalAllocated: number;
 }
 
 export interface MonthlyBudget {
@@ -23,18 +23,18 @@ export interface MonthlyBudget {
 
 export interface CreateGroupDto {
   name: string;
-  month_year: string;
+  monthYear: string;
 }
 
 export interface CreateCategoryDto {
   name: string;
-  allocated_amount: number;
-  group_id: number;
+  allocatedAmount: number;
+  groupId: number;
 }
 
 export interface UpdateCategoryDto {
   name?: string;
-  allocated_amount?: number;
+  allocatedAmount?: number;
 }
 
 export interface UpdateGroupDto {

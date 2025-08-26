@@ -1,34 +1,37 @@
-import { IsOptional, IsNumber, IsBoolean, IsDateString } from 'class-validator';
+import { IsOptional, IsBoolean, IsDateString } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class TransactionFiltersDto {
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, description: 'ID da conta' })
   @IsOptional()
-  @IsNumber()
-  accountId?: number;
+  accountId?: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, description: 'ID da categoria' })
   @IsOptional()
-  @IsNumber()
-  categoryId?: number;
+  categoryId?: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, description: 'Data de início' })
   @IsOptional()
   @IsDateString()
   startDate?: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, description: 'Data de fim' })
   @IsOptional()
   @IsDateString()
   endDate?: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, description: 'Transação compartilhada' })
   @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return undefined;
+  })
   @IsBoolean()
   isShared?: boolean;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, description: 'ID do usuário' })
   @IsOptional()
-  @IsNumber()
-  userId?: number;
+  userId?: string;
 }

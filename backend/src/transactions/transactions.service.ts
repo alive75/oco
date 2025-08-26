@@ -25,11 +25,17 @@ export class TransactionsService {
       .leftJoinAndSelect('transaction.paidBy', 'paidBy');
 
     if (filters?.accountId) {
-      query.andWhere('account.id = :accountId', { accountId: filters.accountId });
+      const accountId = parseInt(filters.accountId, 10);
+      if (!isNaN(accountId)) {
+        query.andWhere('account.id = :accountId', { accountId });
+      }
     }
 
     if (filters?.categoryId) {
-      query.andWhere('category.id = :categoryId', { categoryId: filters.categoryId });
+      const categoryId = parseInt(filters.categoryId, 10);
+      if (!isNaN(categoryId)) {
+        query.andWhere('category.id = :categoryId', { categoryId });
+      }
     }
 
     if (filters?.startDate && filters?.endDate) {
@@ -44,7 +50,10 @@ export class TransactionsService {
     }
 
     if (filters?.userId) {
-      query.andWhere('paidBy.id = :userId', { userId: filters.userId });
+      const userId = parseInt(filters.userId, 10);
+      if (!isNaN(userId)) {
+        query.andWhere('paidBy.id = :userId', { userId });
+      }
     }
 
     return query.orderBy('transaction.date', 'DESC').getMany();

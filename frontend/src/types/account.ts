@@ -3,9 +3,9 @@ export interface Account {
   name: string;
   type: 'CHECKING' | 'CREDIT_CARD' | 'INVESTMENT';
   balance: number;
-  user_id: number;
-  created_at: Date;
-  updated_at: Date;
+  userId: number;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface CreateAccountDto {

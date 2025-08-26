@@ -89,12 +89,21 @@ export const cache = new SimpleCache();
 
 // Cache key generators
 export const cacheKeys = {
-  budget: (month: Date) => `budget:${month.toISOString().slice(0, 7)}`,
+  budget: (month: Date) => {
+    const validDate = new Date(month);
+    return `budget:${validDate.toISOString().slice(0, 7)}`;
+  },
   accounts: () => 'accounts',
   transactions: (filters: Record<string, any>) => 
     `transactions:${JSON.stringify(filters)}`,
-  sharedBalance: (month: Date) => `shared:balance:${month.toISOString().slice(0, 7)}`,
-  sharedTransactions: (month: Date) => `shared:transactions:${month.toISOString().slice(0, 7)}`,
+  sharedBalance: (month: Date) => {
+    const validDate = new Date(month);
+    return `shared:balance:${validDate.toISOString().slice(0, 7)}`;
+  },
+  sharedTransactions: (month: Date) => {
+    const validDate = new Date(month);
+    return `shared:transactions:${validDate.toISOString().slice(0, 7)}`;
+  },
 };
 
 // Auto cleanup every 5 minutes
