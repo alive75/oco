@@ -27,7 +27,18 @@ export const useAccountStore = create<AccountState>((set) => ({
     // Check cache first
     const cachedAccounts = cache.get<Account[]>(cacheKey);
     if (cachedAccounts) {
-      set({ accounts: cachedAccounts, isLoading: false });
+      set((state) => {
+        // Update selectedAccount if it exists in the new accounts data
+        const updatedSelectedAccount = state.selectedAccount 
+          ? cachedAccounts.find(acc => acc.id === state.selectedAccount!.id) || state.selectedAccount
+          : null;
+        
+        return { 
+          accounts: cachedAccounts, 
+          selectedAccount: updatedSelectedAccount,
+          isLoading: false 
+        };
+      });
       return;
     }
 
@@ -38,7 +49,18 @@ export const useAccountStore = create<AccountState>((set) => ({
       // Cache for 3 minutes (accounts don't change as frequently)
       cache.set(cacheKey, accounts, 3);
       
-      set({ accounts, isLoading: false });
+      set((state) => {
+        // Update selectedAccount if it exists in the new accounts data
+        const updatedSelectedAccount = state.selectedAccount 
+          ? accounts.find(acc => acc.id === state.selectedAccount!.id) || state.selectedAccount
+          : null;
+        
+        return { 
+          accounts, 
+          selectedAccount: updatedSelectedAccount,
+          isLoading: false 
+        };
+      });
     } catch (error) {
       set({ isLoading: false });
       throw error;

@@ -21,18 +21,18 @@ import {
   Trash as TrashIcon,
   Search as SearchIcon
 } from 'lucide-react';
-import type { Account, CreateTransactionDto, CreateAccountDto } from '../../types';
+import type { Account, Transaction, CreateTransactionDto, CreateAccountDto } from '../../types';
 
 export default function Accounts() {
   // const { user } = useAuthStore();
   const { accounts, selectedAccount, isLoading: accountsLoading, loadAccounts, selectAccount, createAccount } = useAccountStore();
-  const { transactions, isLoading: transactionsLoading, loadTransactions, addTransaction, deleteTransaction } = useTransactionStore();
+  const { transactions, isLoading: transactionsLoading, loadTransactions, addTransaction, updateTransaction, deleteTransaction } = useTransactionStore();
   const { groups } = useBudgetStore();
   
   const [showTransactionForm, setShowTransactionForm] = useState(false);
   const [showAccountForm, setShowAccountForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  // const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [transactionForm, setTransactionForm] = useState<CreateTransactionDto>({
     accountId: 0,
     amount: 0,
@@ -83,19 +83,35 @@ export default function Accounts() {
     selectAccount(account);
   };
 
-  const openTransactionForm = (account?: Account) => {
+  const openTransactionForm = (account?: Account, transaction?: Transaction) => {
     const targetAccount = account || selectedAccount;
     if (!targetAccount) return;
     
-    setTransactionForm({
-      accountId: targetAccount.id,
-      amount: 0,
-      date: new Date(),
-      payee: '',
-      isShared: false,
-      notes: ''
-    });
-    // setEditingTransaction(null);
+    if (transaction) {
+      // Editing existing transaction
+      setTransactionForm({
+        accountId: transaction.accountId,
+        amount: transaction.amount,
+        date: new Date(transaction.date),
+        payee: transaction.payee,
+        isShared: transaction.isShared,
+        notes: transaction.notes || '',
+        categoryId: transaction.categoryId
+      });
+      setEditingTransaction(transaction);
+    } else {
+      // Creating new transaction
+      setTransactionForm({
+        accountId: targetAccount.id,
+        amount: 0,
+        date: new Date(),
+        payee: '',
+        isShared: false,
+        notes: '',
+        categoryId: undefined
+      });
+      setEditingTransaction(null);
+    }
     setShowTransactionForm(true);
   };
 
@@ -144,13 +160,21 @@ export default function Accounts() {
     }
     
     try {
-      await addTransaction(transactionForm);
+      if (editingTransaction) {
+        // Update existing transaction
+        await updateTransaction(editingTransaction.id, transactionForm);
+      } else {
+        // Create new transaction
+        await addTransaction(transactionForm);
+      }
+      
       setShowTransactionForm(false);
+      setEditingTransaction(null);
       // Reload accounts to update balances
       loadAccounts();
     } catch (error) {
-      console.error('Erro ao criar transação:', error);
-      alert('Erro ao criar transação. Tente novamente.');
+      console.error(`Erro ao ${editingTransaction ? 'atualizar' : 'criar'} transação:`, error);
+      alert(`Erro ao ${editingTransaction ? 'atualizar' : 'criar'} transação. Tente novamente.`);
     }
   };
 
@@ -407,7 +431,7 @@ export default function Accounts() {
                             
                             <div className="flex items-center space-x-2">
                               <button
-                                onClick={() => console.log('Editar transação:', transaction.id)}
+                                onClick={() => openTransactionForm(selectedAccount, transaction)}
                                 className="p-1 text-gray-400 hover:text-white hover:bg-gray-600 rounded transition-all duration-200"
                               >
                                 <EditIcon className="h-4 w-4" />
@@ -456,7 +480,7 @@ export default function Accounts() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
           <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md animate-in zoom-in-95 duration-300">
             <h3 className="text-lg font-semibold text-white mb-4">
-              Nova Transação
+              {editingTransaction ? 'Editar Transação' : 'Nova Transação'}
             </h3>
             
             <form onSubmit={handleTransactionSubmit} className="space-y-4">
@@ -574,11 +598,14 @@ export default function Accounts() {
                   type="submit"
                   className="flex-1 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-medium transition-colors duration-200"
                 >
-                  Salvar <span className="text-xs opacity-70">(Ctrl+Enter)</span>
+                  {editingTransaction ? 'Atualizar' : 'Salvar'} <span className="text-xs opacity-70">(Ctrl+Enter)</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowTransactionForm(false)}
+                  onClick={() => {
+                    setShowTransactionForm(false);
+                    setEditingTransaction(null);
+                  }}
                   className="flex-1 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded font-medium transition-colors duration-200"
                 >
                   Cancelar <span className="text-xs opacity-70">(Esc)</span>

@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { transactionService } from '../services/transaction.service';
 import type { Transaction, CreateTransactionDto, UpdateTransactionDto, TransactionFilters } from '../types';
 import { useBudgetStore } from './budget.store';
+import { cache, cacheKeys } from '../utils/cache';
 
 interface TransactionState {
   transactions: Transaction[];
@@ -53,6 +54,9 @@ export const useTransactionStore = create<TransactionState>()(
       transactions: [newTransaction, ...state.transactions],
     }));
     
+    // Invalidate accounts cache since balance changed
+    cache.invalidate(cacheKeys.accounts());
+    
     // Update budget if transaction has a category
     if (dto.categoryId) {
       const budgetStore = useBudgetStore.getState();
@@ -68,6 +72,9 @@ export const useTransactionStore = create<TransactionState>()(
       ),
     }));
     
+    // Invalidate accounts cache since balance changed
+    cache.invalidate(cacheKeys.accounts());
+    
     // Update budget if transaction had/has a category
     if (dto.categoryId !== undefined) {
       const budgetStore = useBudgetStore.getState();
@@ -81,6 +88,9 @@ export const useTransactionStore = create<TransactionState>()(
     set((state) => ({
       transactions: state.transactions.filter((t) => t.id !== id),
     }));
+
+    // Invalidate accounts cache since balance changed
+    cache.invalidate(cacheKeys.accounts());
 
     // Update budget if transaction had a category
     if (transaction?.categoryId) {
