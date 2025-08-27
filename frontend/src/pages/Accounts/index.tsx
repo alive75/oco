@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAccountStore } from '../../stores/account.store';
 import { useTransactionStore } from '../../stores/transaction.store';
 import { useBudgetStore } from '../../stores/budget.store';
+import { transactionService } from '../../services/transaction.service';
 import { AccountsSkeleton } from '../../components/Skeleton';
 import { NoAccountsSelected, NoAccounts, NoTransactions, LoadingTransactions } from '../../components/EmptyStates';
 import { useModalKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
@@ -192,6 +193,17 @@ export default function Accounts() {
     }
   };
 
+  const handleTransactionUpdate = async (transactionId: number, data: any) => {
+    try {
+      await updateTransaction(transactionId, data);
+      // Reload accounts to update balances
+      loadAccounts();
+    } catch (error) {
+      console.error('Erro ao atualizar transação:', error);
+      alert('Erro ao atualizar transação. Tente novamente.');
+    }
+  };
+
   const handleAccountSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -223,6 +235,298 @@ export default function Accounts() {
 
   // Debounce search query
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
+
+  // Componente para linha de transação (inline editing)
+  const TransactionRow = ({ isNew, transaction, allCategories, onSave, onCancel, onDelete }) => {
+    const [isEditing, setIsEditing] = useState(isNew);
+    const [formData, setFormData] = useState({
+      date: isNew ? new Date().toISOString().slice(0, 10) : new Date(transaction.date).toISOString().slice(0, 10),
+      payee: isNew ? '' : transaction.payee,
+      categoryId: isNew ? '' : (transaction.categoryId || ''),
+      notes: isNew ? '' : (transaction.notes || ''),
+      isShared: isNew ? false : transaction.isShared,
+      paidAmount: isNew ? '' : (transaction.amount < 0 ? Math.abs(transaction.amount).toString() : ''),
+      receivedAmount: isNew ? '' : (transaction.amount >= 0 ? transaction.amount.toString() : '')
+    });
+    
+    const [payeeSuggestions, setPayeeSuggestions] = useState([]);
+    const [showPayeeSuggestions, setShowPayeeSuggestions] = useState(false);
+    const [payeeSearchTimeout, setPayeeSearchTimeout] = useState(null);
+
+    const searchPayees = async (query) => {
+      if (!query || query.length < 2) {
+        setPayeeSuggestions([]);
+        setShowPayeeSuggestions(false);
+        return;
+      }
+      
+      try {
+        const suggestions = await transactionService.searchPayees(query);
+        setPayeeSuggestions(suggestions);
+        setShowPayeeSuggestions(suggestions.length > 0);
+      } catch (error) {
+        console.error('Erro ao buscar pagantes:', error);
+        setPayeeSuggestions([]);
+        setShowPayeeSuggestions(false);
+      }
+    };
+
+    const handlePayeeChange = (value) => {
+      setFormData({ ...formData, payee: value });
+      
+      // Debounce the search
+      if (payeeSearchTimeout) {
+        clearTimeout(payeeSearchTimeout);
+      }
+      
+      const timeout = setTimeout(() => {
+        searchPayees(value);
+      }, 300);
+      
+      setPayeeSearchTimeout(timeout);
+    };
+
+    const selectPayee = (payee) => {
+      setFormData({ ...formData, payee });
+      setShowPayeeSuggestions(false);
+      setPayeeSuggestions([]);
+    };
+
+    const handleSave = (e) => {
+      e.preventDefault();
+      
+      // Validações
+      if (!formData.payee.trim()) {
+        alert('Pagante é obrigatório');
+        return;
+      }
+      
+      const paidAmount = parseFloat(formData.paidAmount) || 0;
+      const receivedAmount = parseFloat(formData.receivedAmount) || 0;
+      
+      if (paidAmount === 0 && receivedAmount === 0) {
+        alert('Deve ser informado um valor pago ou recebido');
+        return;
+      }
+      
+      if (paidAmount > 0 && receivedAmount > 0) {
+        alert('Não é possível ter valor pago e recebido na mesma transação');
+        return;
+      }
+      
+      // Determinar o amount baseado em pago ou recebido
+      const amount = receivedAmount > 0 ? receivedAmount : -paidAmount;
+      
+      const data = {
+        accountId: selectedAccount.id,
+        date: new Date(formData.date),
+        payee: formData.payee.trim(),
+        amount: amount,
+        categoryId: formData.categoryId ? parseInt(formData.categoryId) : undefined,
+        notes: formData.notes.trim() || undefined,
+        isShared: formData.isShared
+      };
+      
+      onSave(isNew ? data : data);
+      
+      if (isNew) {
+        // Reset form for new transaction
+        setFormData({
+          date: new Date().toISOString().slice(0, 10),
+          payee: '',
+          categoryId: '',
+          notes: '',
+          isShared: false,
+          paidAmount: '',
+          receivedAmount: ''
+        });
+      } else {
+        setIsEditing(false);
+      }
+    };
+
+    const handleCancel = () => {
+      if (isNew) {
+        onCancel();
+      } else {
+        setIsEditing(false);
+        // Reset form data
+        setFormData({
+          date: new Date(transaction.date).toISOString().slice(0, 10),
+          payee: transaction.payee,
+          categoryId: transaction.categoryId || '',
+          notes: transaction.notes || '',
+          isShared: transaction.isShared,
+          paidAmount: transaction.amount < 0 ? Math.abs(transaction.amount).toString() : '',
+          receivedAmount: transaction.amount >= 0 ? transaction.amount.toString() : ''
+        });
+      }
+    };
+
+    if (isEditing) {
+      return (
+        <tr className="bg-gray-750 border-2 border-blue-500">
+          <td className="px-3 py-2">
+            <input
+              type="date"
+              value={formData.date}
+              onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+              className="w-full px-2 py-1 bg-gray-600 border border-gray-500 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+              required
+            />
+          </td>
+          <td className="px-3 py-2 relative">
+            <input
+              type="text"
+              value={formData.payee}
+              onChange={(e) => handlePayeeChange(e.target.value)}
+              onFocus={() => formData.payee.length >= 2 && searchPayees(formData.payee)}
+              onBlur={() => {
+                // Delay hiding suggestions to allow click
+                setTimeout(() => setShowPayeeSuggestions(false), 200);
+              }}
+              placeholder="Nome do pagante..."
+              className="w-full px-2 py-1 bg-gray-600 border border-gray-500 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+              required
+            />
+            {showPayeeSuggestions && payeeSuggestions.length > 0 && (
+              <div className="absolute z-10 top-full left-0 right-0 bg-gray-700 border border-gray-500 rounded-b max-h-32 overflow-y-auto">
+                {payeeSuggestions.map((payee, index) => (
+                  <div
+                    key={index}
+                    onClick={() => selectPayee(payee)}
+                    className="px-2 py-1 hover:bg-gray-600 cursor-pointer text-white text-sm"
+                  >
+                    {payee}
+                  </div>
+                ))}
+              </div>
+            )}
+          </td>
+          <td className="px-3 py-2">
+            <select
+              value={formData.categoryId}
+              onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
+              className="w-full px-2 py-1 bg-gray-600 border border-gray-500 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
+              <option value="">Nenhuma</option>
+              {allCategories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+          </td>
+          <td className="px-3 py-2">
+            <input
+              type="text"
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              placeholder="Anotações..."
+              className="w-full px-2 py-1 bg-gray-600 border border-gray-500 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </td>
+          <td className="px-3 py-2 text-center">
+            <input
+              type="checkbox"
+              checked={formData.isShared}
+              onChange={(e) => setFormData({ ...formData, isShared: e.target.checked })}
+              className="rounded bg-gray-600 border-gray-500"
+            />
+          </td>
+          <td className="px-3 py-2">
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={formData.paidAmount}
+              onChange={(e) => setFormData({ ...formData, paidAmount: e.target.value, receivedAmount: '' })}
+              placeholder="0,00"
+              className="w-full px-2 py-1 bg-gray-600 border border-gray-500 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 text-right"
+            />
+          </td>
+          <td className="px-3 py-2">
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={formData.receivedAmount}
+              onChange={(e) => setFormData({ ...formData, receivedAmount: e.target.value, paidAmount: '' })}
+              placeholder="0,00"
+              className="w-full px-2 py-1 bg-gray-600 border border-gray-500 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 text-right"
+            />
+          </td>
+          <td className="px-3 py-2 text-center">
+            <div className="flex items-center justify-center space-x-1">
+              <button
+                onClick={handleSave}
+                className="p-1 text-green-400 hover:text-green-300 hover:bg-gray-600 rounded transition-all duration-200"
+                title="Salvar"
+              >
+                <span className="text-sm">✓</span>
+              </button>
+              <button
+                onClick={handleCancel}
+                className="p-1 text-red-400 hover:text-red-300 hover:bg-gray-600 rounded transition-all duration-200"
+                title="Cancelar"
+              >
+                <span className="text-sm">✕</span>
+              </button>
+            </div>
+          </td>
+        </tr>
+      );
+    }
+
+    // Display mode
+    return (
+      <tr className="hover:bg-gray-750 transition-colors duration-200">
+        <td className="px-3 py-3 text-sm text-gray-300">
+          {formatTransactionDate(transaction.date)}
+        </td>
+        <td className="px-3 py-3 text-sm text-white font-medium">
+          {transaction.payee}
+        </td>
+        <td className="px-3 py-3 text-sm text-gray-300">
+          {transaction.category?.name || '-'}
+        </td>
+        <td className="px-3 py-3 text-sm text-gray-300">
+          {transaction.notes || '-'}
+        </td>
+        <td className="px-3 py-3 text-center">
+          {transaction.isShared && (
+            <span className="px-2 py-1 bg-blue-600 text-xs rounded text-white">
+              ✓
+            </span>
+          )}
+        </td>
+        <td className="px-3 py-3 text-sm text-right text-red-400 font-medium">
+          {transaction.amount < 0 ? formatCurrency(Math.abs(transaction.amount)) : '-'}
+        </td>
+        <td className="px-3 py-3 text-sm text-right text-green-400 font-medium">
+          {transaction.amount >= 0 ? formatCurrency(transaction.amount) : '-'}
+        </td>
+        <td className="px-3 py-3 text-center">
+          <div className="flex items-center justify-center space-x-1">
+            <button
+              onClick={() => setIsEditing(true)}
+              className="p-1 text-gray-400 hover:text-white hover:bg-gray-600 rounded transition-all duration-200"
+              title="Editar"
+            >
+              <EditIcon className="h-3 w-3" />
+            </button>
+            <button
+              onClick={onDelete}
+              className="p-1 text-gray-400 hover:text-red-400 hover:bg-gray-600 rounded transition-all duration-200"
+              title="Excluir"
+            >
+              <TrashIcon className="h-3 w-3" />
+            </button>
+          </div>
+        </td>
+      </tr>
+    );
+  };
 
   // Filter transactions based on search query
   const filteredTransactions = transactions.filter(transaction => {
@@ -361,11 +665,11 @@ export default function Accounts() {
                 </div>
               </div>
 
-              {/* Lista de Transações */}
-              <div className="bg-gray-800 rounded-lg">
+              {/* Lista de Transações - Estilo Planilha */}
+              <div className="bg-gray-800 rounded-lg overflow-hidden">
                 <div className="p-4 border-b border-gray-700">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-white">Transações Recentes</h3>
+                    <h3 className="text-lg font-semibold text-white">Transações</h3>
                     <div className="relative">
                       <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                       <input
@@ -379,93 +683,99 @@ export default function Accounts() {
                   </div>
                 </div>
                 
-                <div className="divide-y divide-gray-700">
-                  {transactionsLoading ? (
-                    <LoadingTransactions />
-                  ) : filteredTransactions.length > 0 ? (
-                    filteredTransactions.map((transaction) => (
-                      <div key={transaction.id} className="p-4 hover:bg-gray-700 transition-colors duration-200">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-4">
-                            <div className="flex flex-col">
-                              <div className="flex items-center space-x-2 text-white font-medium">
-                                <span>{transaction.payee}</span>
-                                {transaction.isShared && (
-                                  <span className="px-2 py-1 bg-blue-600 text-xs rounded">
-                                    Compartilhada
-                                  </span>
-                                )}
-                              </div>
-                              <div className="flex items-center space-x-4 text-sm text-gray-400 mt-1">
-                                <span className="flex items-center space-x-1">
-                                  <CalendarIcon className="h-3 w-3" />
-                                  <span>{formatTransactionDate(transaction.date)}</span>
-                                </span>
-                                {transaction.category && (
-                                  <span className="flex items-center space-x-1">
-                                    <TagIcon className="h-3 w-3" />
-                                    <span>{transaction.category.name}</span>
-                                  </span>
-                                )}
-                                {transaction.user && (
-                                  <span className="flex items-center space-x-1">
-                                    <UserIcon className="h-3 w-3" />
-                                    <span>{transaction.user.name}</span>
-                                  </span>
-                                )}
-                              </div>
-                              {transaction.notes && (
-                                <div className="text-sm text-gray-400 mt-1">
-                                  {transaction.notes}
-                                </div>
-                              )}
-                            </div>
-                          </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    {/* Cabeçalho */}
+                    <thead className="bg-gray-700 border-b border-gray-600">
+                      <tr>
+                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-28">
+                          Data
+                        </th>
+                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                          Pagante
+                        </th>
+                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                          Categoria
+                        </th>
+                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                          Anotação
+                        </th>
+                        <th className="px-3 py-3 text-center text-xs font-medium text-gray-300 uppercase tracking-wider w-20">
+                          Compart.?
+                        </th>
+                        <th className="px-3 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider w-24">
+                          Pago
+                        </th>
+                        <th className="px-3 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider w-24">
+                          Recebido
+                        </th>
+                        <th className="px-3 py-3 text-center text-xs font-medium text-gray-300 uppercase tracking-wider w-16">
+                          Ações
+                        </th>
+                      </tr>
+                    </thead>
+                    
+                    <tbody className="bg-gray-800 divide-y divide-gray-700">
+                      {transactionsLoading ? (
+                        <tr>
+                          <td colSpan={8} className="px-4 py-8">
+                            <LoadingTransactions />
+                          </td>
+                        </tr>
+                      ) : (
+                        <>
+                          {/* Nova Linha de Transação */}
+                          {showTransactionForm && (
+                            <TransactionRow
+                              isNew={true}
+                              transaction={{}}
+                              allCategories={allCategories}
+                              onSave={handleTransactionSubmit}
+                              onCancel={() => setShowTransactionForm(false)}
+                            />
+                          )}
                           
-                          <div className="flex items-center space-x-4">
-                            <div className={`text-lg font-semibold ${
-                              transaction.amount >= 0 ? 'text-green-400' : 'text-red-400'
-                            }`}>
-                              {formatCurrency(Math.abs(transaction.amount))}
-                            </div>
-                            
-                            <div className="flex items-center space-x-2">
-                              <button
-                                onClick={() => openTransactionForm(selectedAccount, transaction)}
-                                className="p-1 text-gray-400 hover:text-white hover:bg-gray-600 rounded transition-all duration-200"
-                              >
-                                <EditIcon className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteTransaction(transaction.id)}
-                                className="p-1 text-gray-400 hover:text-red-400 hover:bg-gray-600 rounded transition-all duration-200"
-                              >
-                                <TrashIcon className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  ) : transactions.length > 0 && debouncedSearchQuery ? (
-                    <div className="p-6 text-center text-gray-400">
-                      <SearchIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <h4 className="text-lg font-medium text-gray-300 mb-2">
-                        Nenhuma transação encontrada
-                      </h4>
-                      <p className="text-gray-400 mb-4">
-                        Nenhuma transação corresponde à busca "{debouncedSearchQuery}"
-                      </p>
-                      <button
-                        onClick={() => setSearchQuery('')}
-                        className="text-blue-400 hover:text-blue-300 text-sm underline"
-                      >
-                        Limpar busca
-                      </button>
-                    </div>
-                  ) : (
-                    <NoTransactions onAddTransaction={() => openTransactionForm(selectedAccount)} />
-                  )}
+                          {/* Transações Existentes */}
+                          {filteredTransactions.length > 0 ? (
+                            filteredTransactions.map((transaction) => (
+                              <TransactionRow
+                                key={transaction.id}
+                                isNew={false}
+                                transaction={transaction}
+                                allCategories={allCategories}
+                                onSave={(data) => handleTransactionUpdate(transaction.id, data)}
+                                onDelete={() => handleDeleteTransaction(transaction.id)}
+                              />
+                            ))
+                          ) : !showTransactionForm && transactions.length > 0 && debouncedSearchQuery ? (
+                            <tr>
+                              <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
+                                <SearchIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                                <h4 className="text-lg font-medium text-gray-300 mb-2">
+                                  Nenhuma transação encontrada
+                                </h4>
+                                <p className="text-gray-400 mb-4">
+                                  Nenhuma transação corresponde à busca "{debouncedSearchQuery}"
+                                </p>
+                                <button
+                                  onClick={() => setSearchQuery('')}
+                                  className="text-blue-400 hover:text-blue-300 text-sm underline"
+                                >
+                                  Limpar busca
+                                </button>
+                              </td>
+                            </tr>
+                          ) : !showTransactionForm ? (
+                            <tr>
+                              <td colSpan={8} className="px-4 py-8">
+                                <NoTransactions onAddTransaction={() => openTransactionForm(selectedAccount)} />
+                              </td>
+                            </tr>
+                          ) : null}
+                        </>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
@@ -475,146 +785,6 @@ export default function Accounts() {
         </div>
       </div>
 
-      {/* Modal de Formulário de Transação */}
-      {showTransactionForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
-          <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md animate-in zoom-in-95 duration-300">
-            <h3 className="text-lg font-semibold text-white mb-4">
-              {editingTransaction ? 'Editar Transação' : 'Nova Transação'}
-            </h3>
-            
-            <form onSubmit={handleTransactionSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Data
-                </label>
-                <input
-                  type="date"
-                  value={transactionForm.date.toISOString().slice(0, 10)}
-                  max={new Date().toISOString().slice(0, 10)} // Don't allow future dates
-                  onChange={(e) => setTransactionForm({
-                    ...transactionForm,
-                    date: new Date(e.target.value)
-                  })}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Pagante
-                </label>
-                <input
-                  type="text"
-                  value={transactionForm.payee}
-                  onChange={(e) => setTransactionForm({
-                    ...transactionForm,
-                    payee: e.target.value
-                  })}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Ex: Supermercado, Restaurante..."
-                  maxLength={200}
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Categoria
-                </label>
-                <select
-                  value={transactionForm.categoryId || ''}
-                  onChange={(e) => setTransactionForm({
-                    ...transactionForm,
-                    categoryId: e.target.value ? Number(e.target.value) : undefined
-                  })}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white"
-                >
-                  <option value="">Selecione uma categoria (opcional)</option>
-                  {allCategories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Valor (R$)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  max="1000000"
-                  value={transactionForm.amount}
-                  onChange={(e) => setTransactionForm({
-                    ...transactionForm,
-                    amount: parseFloat(e.target.value) || 0
-                  })}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="0,00"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="flex items-center space-x-2 text-sm text-gray-300">
-                  <input
-                    type="checkbox"
-                    checked={transactionForm.isShared}
-                    onChange={(e) => setTransactionForm({
-                      ...transactionForm,
-                      isShared: e.target.checked
-                    })}
-                    className="rounded bg-gray-700 border-gray-600"
-                  />
-                  <span>Despesa compartilhada</span>
-                </label>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Anotações (opcional)
-                </label>
-                <textarea
-                  value={transactionForm.notes || ''}
-                  onChange={(e) => setTransactionForm({
-                    ...transactionForm,
-                    notes: e.target.value
-                  })}
-                  rows={2}
-                  maxLength={500}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Informações adicionais..."
-                />
-              </div>
-
-              <div className="flex space-x-3 pt-4">
-                <button
-                  id="transaction-form-submit"
-                  type="submit"
-                  className="flex-1 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-medium transition-colors duration-200"
-                >
-                  {editingTransaction ? 'Atualizar' : 'Salvar'} <span className="text-xs opacity-70">(Ctrl+Enter)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowTransactionForm(false);
-                    setEditingTransaction(null);
-                  }}
-                  className="flex-1 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded font-medium transition-colors duration-200"
-                >
-                  Cancelar <span className="text-xs opacity-70">(Esc)</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Modal de Formulário de Conta */}
       {showAccountForm && (

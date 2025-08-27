@@ -194,6 +194,24 @@ export class TransactionsService {
     return transactions.reduce((total, transaction) => total + Number(transaction.amount), 0);
   }
 
+  async searchPayees(query: string, userId: number): Promise<string[]> {
+    if (!query || query.trim().length < 2) {
+      return [];
+    }
+
+    const result = await this.transactionsRepository
+      .createQueryBuilder('transaction')
+      .select('DISTINCT transaction.payee', 'payee')
+      .innerJoin('transaction.paidBy', 'paidBy')
+      .where('paidBy.id = :userId', { userId })
+      .andWhere('LOWER(transaction.payee) LIKE LOWER(:query)', { query: `%${query.trim()}%` })
+      .orderBy('transaction.payee', 'ASC')
+      .limit(10)
+      .getRawMany();
+
+    return result.map(item => item.payee);
+  }
+
   async getSharedTransactions(month?: Date): Promise<Transaction[]> {
     const query = this.transactionsRepository.createQueryBuilder('transaction')
       .leftJoinAndSelect('transaction.account', 'account')

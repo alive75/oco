@@ -61,5 +61,15 @@ export const transactionService = {
       console.error('Erro ao deletar transação:', error);
       throw error;
     }
+  },
+
+  async searchPayees(query: string) {
+    try {
+      const { data } = await api.get(`/transactions/payees/search?q=${encodeURIComponent(query)}`);
+      return data;
+    } catch (error) {
+      console.error('Erro ao buscar pagantes:', error);
+      throw error;
+    }
   }
 };

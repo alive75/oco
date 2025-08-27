@@ -57,6 +57,13 @@ export class TransactionsController {
     return this.transactionsService.remove(+id, req.user.userId);
   }
 
+  @Get('payees/search')
+  @ApiOperation({ summary: 'Buscar pagantes únicos' })
+  @ApiQuery({ name: 'q', required: true, description: 'Termo de busca para pagantes' })
+  searchPayees(@Query('q') query: string, @Request() req) {
+    return this.transactionsService.searchPayees(query, req.user.userId);
+  }
+
   @Get('credit-card/:accountId/current-bill')
   @ApiOperation({ summary: 'Obter fatura atual do cartão de crédito' })
   getCurrentBill(@Param('accountId') accountId: string, @Request() req) {
