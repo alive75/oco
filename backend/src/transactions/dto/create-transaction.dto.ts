@@ -1,7 +1,18 @@
-import { IsString, IsNotEmpty, IsNumber, IsBoolean, IsOptional, IsDateString, Min, Max, MaxLength, Validate } from 'class-validator';
+import { IsString, IsNotEmpty, IsNumber, IsBoolean, IsOptional, IsDateString, Min, Max, MaxLength, Validate, ValidatorConstraint, ValidatorConstraintInterface } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { NotFutureDateConstraint } from '../../common/validators/not-future-date.validator';
+
+@ValidatorConstraint({ name: 'isNotZero', async: false })
+class IsNotZeroConstraint implements ValidatorConstraintInterface {
+  validate(value: number) {
+    return value !== 0;
+  }
+
+  defaultMessage() {
+    return 'O valor não pode ser zero';
+  }
+}
 
 export class CreateTransactionDto {
   @ApiProperty({ example: '2024-01-15', description: 'Data da transação (não pode ser no futuro)' })
@@ -16,10 +27,11 @@ export class CreateTransactionDto {
   @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   payee: string;
 
-  @ApiProperty({ example: 150.75, description: 'Valor da transação (deve ser positivo e não pode exceder R$ 1,000,000)' })
+  @ApiProperty({ example: 150.75, description: 'Valor da transação (positivo = gasto, negativo = receita)' })
   @IsNumber({}, { message: 'O valor deve ser um número válido' })
-  @Min(0.01, { message: 'O valor deve ser maior que zero' })
+  @Min(-1000000, { message: 'O valor não pode ser menor que -R$ 1.000.000' })
   @Max(1000000, { message: 'O valor não pode exceder R$ 1.000.000' })
+  @Validate(IsNotZeroConstraint)
   amount: number;
 
   @ApiProperty({ example: false, required: false })

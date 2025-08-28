@@ -28,7 +28,7 @@ export default function Accounts() {
   // const { user } = useAuthStore();
   const { accounts, selectedAccount, isLoading: accountsLoading, loadAccounts, selectAccount, createAccount } = useAccountStore();
   const { transactions, isLoading: transactionsLoading, loadTransactions, addTransaction, updateTransaction, deleteTransaction } = useTransactionStore();
-  const { groups } = useBudgetStore();
+  const { groups, loadBudget } = useBudgetStore();
   
   const [showTransactionForm, setShowTransactionForm] = useState(false);
   const [showAccountForm, setShowAccountForm] = useState(false);
@@ -50,7 +50,8 @@ export default function Accounts() {
 
   useEffect(() => {
     loadAccounts();
-  }, [loadAccounts]);
+    loadBudget();
+  }, [loadAccounts, loadBudget]);
 
   useEffect(() => {
     if (selectedAccount) {
@@ -179,7 +180,36 @@ export default function Accounts() {
     }
   };
 
+  const handleTransactionSave = async (transactionData: any) => {
+    console.log('Dados da transação sendo salvos:', transactionData);
+    
+    try {
+      if (transactionData.id) {
+        // Update existing transaction
+        console.log('Atualizando transação existente:', transactionData.id);
+        await updateTransaction(transactionData.id, transactionData);
+      } else {
+        // Create new transaction
+        console.log('Criando nova transação:', transactionData);
+        await addTransaction(transactionData);
+      }
+      
+      // Reload accounts to update balances
+      loadAccounts();
+    } catch (error) {
+      console.error('Erro ao salvar transação:', error);
+      console.error('Detalhes do erro:', error.response?.data);
+      alert(`Erro ao salvar transação: ${error.response?.data?.message || error.message}`);
+    }
+  };
+
   const handleDeleteTransaction = async (transactionId: number) => {
+    if (!transactionId || isNaN(transactionId) || transactionId <= 0) {
+      console.error('ID da transação inválido:', transactionId);
+      alert('Erro: ID da transação inválido.');
+      return;
+    }
+    
     if (!window.confirm('Tem certeza que deseja excluir esta transação?')) {
       return;
     }
@@ -194,6 +224,12 @@ export default function Accounts() {
   };
 
   const handleTransactionUpdate = async (transactionId: number, data: any) => {
+    if (!transactionId || isNaN(transactionId) || transactionId <= 0) {
+      console.error('ID da transação inválido:', transactionId);
+      alert('Erro: ID da transação inválido.');
+      return;
+    }
+    
     try {
       await updateTransaction(transactionId, data);
       // Reload accounts to update balances
@@ -231,7 +267,7 @@ export default function Accounts() {
   };
 
   // Get all categories from all groups for the select
-  const allCategories = groups.flatMap(group => group.categories);
+  const allCategories = groups.flatMap(group => group.categories || []);
 
   // Debounce search query
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
@@ -245,8 +281,8 @@ export default function Accounts() {
       categoryId: isNew ? '' : (transaction.categoryId || ''),
       notes: isNew ? '' : (transaction.notes || ''),
       isShared: isNew ? false : transaction.isShared,
-      paidAmount: isNew ? '' : (transaction.amount < 0 ? Math.abs(transaction.amount).toString() : ''),
-      receivedAmount: isNew ? '' : (transaction.amount >= 0 ? transaction.amount.toString() : '')
+      paidAmount: isNew ? '' : (transaction.amount > 0 ? transaction.amount.toString() : ''),
+      receivedAmount: isNew ? '' : (transaction.amount < 0 ? Math.abs(transaction.amount).toString() : '')
     });
     
     const [payeeSuggestions, setPayeeSuggestions] = useState([]);
@@ -315,14 +351,16 @@ export default function Accounts() {
       }
       
       // Determinar o amount baseado em pago ou recebido
-      const amount = receivedAmount > 0 ? receivedAmount : -paidAmount;
+      // Valores positivos = gastos (diminuem saldo)
+      // Valores negativos = receitas (aumentam saldo)
+      const amount = receivedAmount > 0 ? -receivedAmount : paidAmount;
       
       const data = {
         accountId: selectedAccount.id,
-        date: new Date(formData.date),
+        date: formData.date, // Manter como string no formato ISO
         payee: formData.payee.trim(),
         amount: amount,
-        categoryId: formData.categoryId ? parseInt(formData.categoryId) : undefined,
+        categoryId: formData.categoryId && parseInt(formData.categoryId) > 0 ? parseInt(formData.categoryId) : undefined,
         notes: formData.notes.trim() || undefined,
         isShared: formData.isShared
       };
@@ -366,16 +404,16 @@ export default function Accounts() {
     if (isEditing) {
       return (
         <tr className="bg-gray-750 border-2 border-blue-500">
-          <td className="px-3 py-2">
+          <td className="px-4 py-3">
             <input
               type="date"
               value={formData.date}
               onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-              className="w-full px-2 py-1 bg-gray-600 border border-gray-500 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full px-2 py-2 bg-gray-600 border border-gray-500 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
               required
             />
           </td>
-          <td className="px-3 py-2 relative">
+          <td className="px-4 py-3 relative">
             <input
               type="text"
               value={formData.payee}
@@ -386,7 +424,7 @@ export default function Accounts() {
                 setTimeout(() => setShowPayeeSuggestions(false), 200);
               }}
               placeholder="Nome do pagante..."
-              className="w-full px-2 py-1 bg-gray-600 border border-gray-500 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full px-2 py-2 bg-gray-600 border border-gray-500 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
               required
             />
             {showPayeeSuggestions && payeeSuggestions.length > 0 && (
@@ -403,11 +441,11 @@ export default function Accounts() {
               </div>
             )}
           </td>
-          <td className="px-3 py-2">
+          <td className="px-4 py-3">
             <select
               value={formData.categoryId}
               onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-              className="w-full px-2 py-1 bg-gray-600 border border-gray-500 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full px-2 py-2 bg-gray-600 border border-gray-500 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
               <option value="">Nenhuma</option>
               {allCategories.map((category) => (
@@ -417,16 +455,16 @@ export default function Accounts() {
               ))}
             </select>
           </td>
-          <td className="px-3 py-2">
+          <td className="px-4 py-3">
             <input
               type="text"
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               placeholder="Anotações..."
-              className="w-full px-2 py-1 bg-gray-600 border border-gray-500 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full px-2 py-2 bg-gray-600 border border-gray-500 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </td>
-          <td className="px-3 py-2 text-center">
+          <td className="px-4 py-3 text-center">
             <input
               type="checkbox"
               checked={formData.isShared}
@@ -434,7 +472,7 @@ export default function Accounts() {
               className="rounded bg-gray-600 border-gray-500"
             />
           </td>
-          <td className="px-3 py-2">
+          <td className="px-4 py-3">
             <input
               type="number"
               step="0.01"
@@ -442,10 +480,10 @@ export default function Accounts() {
               value={formData.paidAmount}
               onChange={(e) => setFormData({ ...formData, paidAmount: e.target.value, receivedAmount: '' })}
               placeholder="0,00"
-              className="w-full px-2 py-1 bg-gray-600 border border-gray-500 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 text-right"
+              className="w-full px-2 py-2 bg-gray-600 border border-gray-500 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 text-right"
             />
           </td>
-          <td className="px-3 py-2">
+          <td className="px-4 py-3">
             <input
               type="number"
               step="0.01"
@@ -453,10 +491,10 @@ export default function Accounts() {
               value={formData.receivedAmount}
               onChange={(e) => setFormData({ ...formData, receivedAmount: e.target.value, paidAmount: '' })}
               placeholder="0,00"
-              className="w-full px-2 py-1 bg-gray-600 border border-gray-500 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 text-right"
+              className="w-full px-2 py-2 bg-gray-600 border border-gray-500 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 text-right"
             />
           </td>
-          <td className="px-3 py-2 text-center">
+          <td className="px-4 py-3 text-center">
             <div className="flex items-center justify-center space-x-1">
               <button
                 onClick={handleSave}
@@ -481,32 +519,32 @@ export default function Accounts() {
     // Display mode
     return (
       <tr className="hover:bg-gray-750 transition-colors duration-200">
-        <td className="px-3 py-3 text-sm text-gray-300">
+        <td className="px-4 py-4 text-sm text-gray-300">
           {formatTransactionDate(transaction.date)}
         </td>
-        <td className="px-3 py-3 text-sm text-white font-medium">
+        <td className="px-4 py-4 text-sm text-white font-medium">
           {transaction.payee}
         </td>
-        <td className="px-3 py-3 text-sm text-gray-300">
+        <td className="px-4 py-4 text-sm text-gray-300">
           {transaction.category?.name || '-'}
         </td>
-        <td className="px-3 py-3 text-sm text-gray-300">
+        <td className="px-4 py-4 text-sm text-gray-300">
           {transaction.notes || '-'}
         </td>
-        <td className="px-3 py-3 text-center">
+        <td className="px-4 py-4 text-center">
           {transaction.isShared && (
             <span className="px-2 py-1 bg-blue-600 text-xs rounded text-white">
               ✓
             </span>
           )}
         </td>
-        <td className="px-3 py-3 text-sm text-right text-red-400 font-medium">
+        <td className="px-4 py-4 text-sm text-right text-red-400 font-medium">
+          {transaction.amount > 0 ? formatCurrency(transaction.amount) : '-'}
+        </td>
+        <td className="px-4 py-4 text-sm text-right text-green-400 font-medium">
           {transaction.amount < 0 ? formatCurrency(Math.abs(transaction.amount)) : '-'}
         </td>
-        <td className="px-3 py-3 text-sm text-right text-green-400 font-medium">
-          {transaction.amount >= 0 ? formatCurrency(transaction.amount) : '-'}
-        </td>
-        <td className="px-3 py-3 text-center">
+        <td className="px-4 py-4 text-center">
           <div className="flex items-center justify-center space-x-1">
             <button
               onClick={() => setIsEditing(true)}
@@ -561,7 +599,7 @@ export default function Accounts() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
+    <div className="max-w-7xl mx-auto p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-white">Contas</h1>
         <div className="flex space-x-3">
@@ -583,51 +621,57 @@ export default function Accounts() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Lista de Contas */}
-        <div className="space-y-4">
+      {/* Lista de Contas - Horizontal */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-300">Suas Contas</h2>
-          
-          {accounts.map((account) => (
-            <div
-              key={account.id}
-              className={`bg-gray-800 rounded-lg p-4 cursor-pointer transition-all duration-200 ${
-                selectedAccount?.id === account.id 
-                  ? 'border-2 border-blue-500 bg-gray-700 transform scale-[1.02]' 
-                  : 'hover:bg-gray-700 hover:transform hover:scale-[1.01]'
-              }`}
-              onClick={() => handleAccountSelect(account)}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="text-gray-400">
-                    {getAccountIcon(account.type)}
+          <div className="text-sm text-gray-400">
+            {accounts.length > 0 ? `${accounts.length} conta${accounts.length > 1 ? 's' : ''}` : 'Nenhuma conta'}
+          </div>
+        </div>
+        
+        {accounts.length > 0 ? (
+          <div className="flex gap-4 overflow-x-auto pb-2">
+            {accounts.map((account) => (
+              <div
+                key={account.id}
+                className={`bg-gray-800 rounded-lg p-4 cursor-pointer transition-all duration-200 flex-shrink-0 w-80 ${
+                  selectedAccount?.id === account.id 
+                    ? 'border-2 border-blue-500 bg-gray-700 ring-2 ring-blue-500 ring-opacity-20' 
+                    : 'hover:bg-gray-700 border-2 border-transparent'
+                }`}
+                onClick={() => handleAccountSelect(account)}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3 flex-1 min-w-0">
+                    <div className="text-gray-400">
+                      {getAccountIcon(account.type)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-white font-medium truncate">{account.name}</h3>
+                      <p className="text-sm text-gray-400">
+                        {getAccountTypeLabel(account.type)}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-white font-medium">{account.name}</h3>
-                    <p className="text-sm text-gray-400">
-                      {getAccountTypeLabel(account.type)}
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className={`text-lg font-semibold ${
-                    account.balance >= 0 ? 'text-green-400' : 'text-red-400'
-                  }`}>
-                    {formatCurrency(account.balance)}
+                  <div className="text-right ml-4 flex-shrink-0 min-w-0">
+                    <div className={`text-sm font-semibold whitespace-nowrap ${
+                      account.balance >= 0 ? 'text-green-400' : 'text-red-400'
+                    }`}>
+                      {formatCurrency(account.balance)}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
+        ) : (
+          <NoAccounts onAddAccount={() => setShowAccountForm(true)} />
+        )}
+      </div>
 
-          {accounts.length === 0 && (
-            <NoAccounts onAddAccount={() => setShowAccountForm(true)} />
-          )}
-        </div>
-
-        {/* Detalhes da Conta e Transações */}
-        <div className="lg:col-span-2">
+      {/* Detalhes da Conta e Transações */}
+      <div>
           {selectedAccount ? (
             <div className="space-y-6">
               {/* Header da Conta Selecionada */}
@@ -683,33 +727,33 @@ export default function Accounts() {
                   </div>
                 </div>
                 
-                <div className="overflow-x-auto">
-                  <table className="w-full">
+                <div className="overflow-hidden">
+                  <table className="w-full table-auto">
                     {/* Cabeçalho */}
                     <thead className="bg-gray-700 border-b border-gray-600">
                       <tr>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-28">
+                        <th className="px-4 py-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-28">
                           Data
                         </th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        <th className="px-4 py-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                           Pagante
                         </th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        <th className="px-4 py-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-36">
                           Categoria
                         </th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        <th className="px-4 py-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                           Anotação
                         </th>
-                        <th className="px-3 py-3 text-center text-xs font-medium text-gray-300 uppercase tracking-wider w-20">
+                        <th className="px-4 py-4 text-center text-xs font-medium text-gray-300 uppercase tracking-wider w-20">
                           Compart.?
                         </th>
-                        <th className="px-3 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider w-24">
+                        <th className="px-4 py-4 text-right text-xs font-medium text-gray-300 uppercase tracking-wider w-28">
                           Pago
                         </th>
-                        <th className="px-3 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider w-24">
+                        <th className="px-4 py-4 text-right text-xs font-medium text-gray-300 uppercase tracking-wider w-28">
                           Recebido
                         </th>
-                        <th className="px-3 py-3 text-center text-xs font-medium text-gray-300 uppercase tracking-wider w-16">
+                        <th className="px-4 py-4 text-center text-xs font-medium text-gray-300 uppercase tracking-wider w-20">
                           Ações
                         </th>
                       </tr>
@@ -730,7 +774,7 @@ export default function Accounts() {
                               isNew={true}
                               transaction={{}}
                               allCategories={allCategories}
-                              onSave={handleTransactionSubmit}
+                              onSave={handleTransactionSave}
                               onCancel={() => setShowTransactionForm(false)}
                             />
                           )}
@@ -782,9 +826,7 @@ export default function Accounts() {
           ) : (
             <NoAccountsSelected />
           )}
-        </div>
       </div>
-
 
       {/* Modal de Formulário de Conta */}
       {showAccountForm && (

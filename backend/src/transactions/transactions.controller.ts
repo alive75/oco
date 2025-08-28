@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, Request, UsePipes } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, Request, UsePipes, BadRequestException } from '@nestjs/common';
 import { TransactionsService } from './transactions.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
@@ -36,10 +36,21 @@ export class TransactionsController {
     return this.transactionsService.getSharedTransactions(targetMonth);
   }
 
+  @Get('search-payees')
+  @ApiOperation({ summary: 'Buscar pagantes únicos' })
+  @ApiQuery({ name: 'q', required: true, description: 'Termo de busca para pagantes' })
+  async searchPayees(@Query('q') query: string, @Request() req): Promise<string[]> {
+    return await this.transactionsService.searchPayees(query, req.user.userId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Obter transação por ID' })
   findOne(@Param('id') id: string) {
-    return this.transactionsService.findOne(+id);
+    const numericId = parseInt(id, 10);
+    if (isNaN(numericId) || numericId <= 0) {
+      throw new BadRequestException('ID da transação deve ser um número válido');
+    }
+    return this.transactionsService.findOne(numericId);
   }
 
   @Patch(':id')
@@ -47,26 +58,31 @@ export class TransactionsController {
   @UseGuards(TransactionOwnershipGuard)
   @UsePipes(BusinessValidationPipe)
   update(@Param('id') id: string, @Body() updateTransactionDto: UpdateTransactionDto, @Request() req) {
-    return this.transactionsService.update(+id, updateTransactionDto, req.user.userId);
+    const numericId = parseInt(id, 10);
+    if (isNaN(numericId) || numericId <= 0) {
+      throw new BadRequestException('ID da transação deve ser um número válido');
+    }
+    return this.transactionsService.update(numericId, updateTransactionDto, req.user.userId);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Deletar transação' })
   @UseGuards(TransactionOwnershipGuard)
   remove(@Param('id') id: string, @Request() req) {
-    return this.transactionsService.remove(+id, req.user.userId);
-  }
-
-  @Get('payees/search')
-  @ApiOperation({ summary: 'Buscar pagantes únicos' })
-  @ApiQuery({ name: 'q', required: true, description: 'Termo de busca para pagantes' })
-  searchPayees(@Query('q') query: string, @Request() req) {
-    return this.transactionsService.searchPayees(query, req.user.userId);
+    const numericId = parseInt(id, 10);
+    if (isNaN(numericId) || numericId <= 0) {
+      throw new BadRequestException('ID da transação deve ser um número válido');
+    }
+    return this.transactionsService.remove(numericId, req.user.userId);
   }
 
   @Get('credit-card/:accountId/current-bill')
   @ApiOperation({ summary: 'Obter fatura atual do cartão de crédito' })
   getCurrentBill(@Param('accountId') accountId: string, @Request() req) {
-    return this.transactionsService.getCurrentBill(+accountId, req.user.userId);
+    const numericAccountId = parseInt(accountId, 10);
+    if (isNaN(numericAccountId) || numericAccountId <= 0) {
+      throw new BadRequestException('ID da conta deve ser um número válido');
+    }
+    return this.transactionsService.getCurrentBill(numericAccountId, req.user.userId);
   }
 }

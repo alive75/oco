@@ -34,9 +34,9 @@ export class BusinessValidationPipe implements PipeTransform {
       }
     }
 
-    // Não permitir valores negativos
-    if (dto.amount !== undefined && dto.amount <= 0) {
-      throw new BadRequestException('O valor da transação deve ser maior que zero');
+    // Não permitir valores zero (receitas são valores negativos, despesas são valores positivos)
+    if (dto.amount !== undefined && dto.amount === 0) {
+      throw new BadRequestException('O valor da transação não pode ser zero');
     }
 
     // Validar tamanho das anotações

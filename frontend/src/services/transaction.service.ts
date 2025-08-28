@@ -65,11 +65,12 @@ export const transactionService = {
 
   async searchPayees(query: string) {
     try {
-      const { data } = await api.get(`/transactions/payees/search?q=${encodeURIComponent(query)}`);
-      return data;
+      const { data } = await api.get(`/transactions/search-payees?q=${encodeURIComponent(query)}`);
+      return data || [];
     } catch (error) {
       console.error('Erro ao buscar pagantes:', error);
-      throw error;
+      // Retorna array vazio em caso de erro para não quebrar a UI
+      return [];
     }
   }
 };

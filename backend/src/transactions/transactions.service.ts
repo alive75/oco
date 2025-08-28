@@ -60,6 +60,11 @@ export class TransactionsService {
   }
 
   async findOne(id: number): Promise<Transaction> {
+    // Validação adicional de segurança no service
+    if (!id || isNaN(Number(id)) || id <= 0) {
+      throw new BadRequestException('ID da transação deve ser um número válido');
+    }
+
     const transaction = await this.transactionsRepository.findOne({
       where: { id },
       relations: ['account', 'category', 'paidBy'],
@@ -199,17 +204,24 @@ export class TransactionsService {
       return [];
     }
 
-    const result = await this.transactionsRepository
-      .createQueryBuilder('transaction')
-      .select('DISTINCT transaction.payee', 'payee')
-      .innerJoin('transaction.paidBy', 'paidBy')
-      .where('paidBy.id = :userId', { userId })
-      .andWhere('LOWER(transaction.payee) LIKE LOWER(:query)', { query: `%${query.trim()}%` })
-      .orderBy('transaction.payee', 'ASC')
-      .limit(10)
-      .getRawMany();
+    try {
+      const result = await this.transactionsRepository
+        .createQueryBuilder('transaction')
+        .select('DISTINCT transaction.payee', 'payee')
+        .innerJoin('transaction.paidBy', 'paidBy')
+        .where('paidBy.id = :userId', { userId })
+        .andWhere('LOWER(transaction.payee) LIKE LOWER(:query)', { query: `%${query.trim()}%` })
+        .orderBy('transaction.payee', 'ASC')
+        .limit(10)
+        .getRawMany();
 
-    return result.map(item => item.payee);
+      return result.map(item => item.payee);
+    } catch (error) {
+      console.error('Erro ao buscar pagantes no banco de dados:', error);
+      // Retorna array vazio em caso de erro de conectividade do banco
+      // Isso permite que a aplicação continue funcionando mesmo sem banco
+      return [];
+    }
   }
 
   async getSharedTransactions(month?: Date): Promise<Transaction[]> {
