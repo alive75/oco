@@ -1,16 +1,19 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Account, AccountType } from './entities/account.entity';
 import { CreateAccountDto } from './dto/create-account.dto';
 import { UpdateAccountDto } from './dto/update-account.dto';
 import { BudgetsService } from '../budgets/budgets.service';
+import { Transaction } from '../transactions/entities/transaction.entity';
 
 @Injectable()
 export class AccountsService {
   constructor(
     @InjectRepository(Account)
     private accountsRepository: Repository<Account>,
+    @InjectRepository(Transaction)
+    private transactionsRepository: Repository<Transaction>,
   ) {}
 
   async findAll(): Promise<Account[]> {
@@ -107,7 +110,17 @@ export class AccountsService {
   async remove(id: number, userId: number): Promise<void> {
     const account = await this.findOne(id, userId);
     
-    // TODO: Verificar se há transações vinculadas antes de deletar
+    // Verificar se há transações vinculadas antes de deletar
+    const transactionCount = await this.transactionsRepository.count({
+      where: { account: { id: id } }
+    });
+    
+    if (transactionCount > 0) {
+      throw new BadRequestException(
+        `Não é possível deletar a conta "${account.name}" pois ela possui ${transactionCount} transação${transactionCount > 1 ? 'ões' : ''} vinculada${transactionCount > 1 ? 's' : ''}. Exclua as transações primeiro ou transfira-as para outra conta.`
+      );
+    }
+    
     await this.accountsRepository.remove(account);
   }
 

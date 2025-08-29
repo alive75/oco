@@ -21,7 +21,6 @@ export const transactionService = {
         });
       }
       
-      console.log('Sending filters to backend:', processedFilters);
       const { data } = await api.get('/transactions', { 
         params: Object.keys(processedFilters).length > 0 ? processedFilters : undefined 
       });

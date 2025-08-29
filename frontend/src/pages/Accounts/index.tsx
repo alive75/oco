@@ -26,7 +26,7 @@ import type { Account, Transaction, CreateTransactionDto, CreateAccountDto } fro
 
 export default function Accounts() {
   // const { user } = useAuthStore();
-  const { accounts, selectedAccount, isLoading: accountsLoading, loadAccounts, selectAccount, createAccount } = useAccountStore();
+  const { accounts, selectedAccount, isLoading: accountsLoading, loadAccounts, selectAccount, createAccount, deleteAccount } = useAccountStore();
   const { transactions, isLoading: transactionsLoading, loadTransactions, addTransaction, updateTransaction, deleteTransaction } = useTransactionStore();
   const { groups, loadBudget } = useBudgetStore();
   
@@ -259,6 +259,28 @@ export default function Accounts() {
     } catch (error) {
       console.error('Erro ao criar conta:', error);
       alert('Erro ao criar conta. Tente novamente.');
+    }
+  };
+
+  const handleDeleteAccount = async (accountId: number) => {
+    const account = accounts.find(acc => acc.id === accountId);
+    if (!account) return;
+    
+    if (!window.confirm(`Tem certeza que deseja excluir a conta "${account.name}"?`)) {
+      return;
+    }
+    
+    try {
+      await deleteAccount(accountId);
+    } catch (error: any) {
+      console.error('Erro ao deletar conta:', error);
+      let errorMessage = 'Erro ao deletar conta. Tente novamente.';
+      
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+      
+      alert(errorMessage);
     }
   };
 
@@ -635,32 +657,48 @@ export default function Accounts() {
             {accounts.map((account) => (
               <div
                 key={account.id}
-                className={`bg-gray-800 rounded-lg p-4 cursor-pointer transition-all duration-200 flex-shrink-0 w-80 ${
+                className={`bg-gray-800 rounded-lg p-4 transition-all duration-200 flex-shrink-0 w-80 ${
                   selectedAccount?.id === account.id 
                     ? 'border-2 border-blue-500 bg-gray-700 ring-2 ring-blue-500 ring-opacity-20' 
                     : 'hover:bg-gray-700 border-2 border-transparent'
                 }`}
-                onClick={() => handleAccountSelect(account)}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3 flex-1 min-w-0">
-                    <div className="text-gray-400">
-                      {getAccountIcon(account.type)}
+                <div 
+                  className="cursor-pointer" 
+                  onClick={() => handleAccountSelect(account)}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center space-x-3 flex-1 min-w-0">
+                      <div className="text-gray-400">
+                        {getAccountIcon(account.type)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-white font-medium truncate">{account.name}</h3>
+                        <p className="text-sm text-gray-400">
+                          {getAccountTypeLabel(account.type)}
+                        </p>
+                      </div>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="text-white font-medium truncate">{account.name}</h3>
-                      <p className="text-sm text-gray-400">
-                        {getAccountTypeLabel(account.type)}
-                      </p>
+                    <div className="text-right ml-4 flex-shrink-0 min-w-0">
+                      <div className={`text-sm font-semibold whitespace-nowrap ${
+                        account.balance >= 0 ? 'text-green-400' : 'text-red-400'
+                      }`}>
+                        {formatCurrency(account.balance)}
+                      </div>
                     </div>
                   </div>
-                  <div className="text-right ml-4 flex-shrink-0 min-w-0">
-                    <div className={`text-sm font-semibold whitespace-nowrap ${
-                      account.balance >= 0 ? 'text-green-400' : 'text-red-400'
-                    }`}>
-                      {formatCurrency(account.balance)}
-                    </div>
-                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteAccount(account.id);
+                    }}
+                    className="p-1 text-gray-400 hover:text-red-400 hover:bg-gray-600 rounded transition-all duration-200"
+                    title={`Excluir conta "${account.name}"`}
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
             ))}
