@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Between } from 'typeorm';
 import { BudgetGroup } from './entities/budget-group.entity';
 import { BudgetCategory } from './entities/budget-category.entity';
 import { CreateGroupDto } from './dto/create-group.dto';
@@ -101,6 +101,7 @@ export class BudgetsService {
     const category = this.budgetCategoriesRepository.create({
       name: createCategoryDto.name,
       allocatedAmount: createCategoryDto.allocatedAmount || 0,
+      isSpecial: createCategoryDto.isSpecial || false,
       group,
     });
 
@@ -171,20 +172,40 @@ export class BudgetsService {
   }
 
   async getReadyToAssign(month: Date): Promise<number> {
-    // TODO: Implementar cálculo baseado na renda total - soma das alocações
-    // Por enquanto, retornar 0
+    // Calcular total recebido no mês a partir das transações reais da categoria "Pronto para Atribuir"
+    const readyToAssignCategory = await this.findOrCreateReadyToAssignCategory(month);
+    const { Transaction } = await import('../transactions/entities/transaction.entity');
+    const transactionRepository = this.budgetGroupsRepository.manager.getRepository(Transaction);
+    
+    const startOfMonth = new Date(month.getFullYear(), month.getMonth(), 1);
+    const endOfMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+    
+    // Buscar transações da categoria "Pronto para Atribuir" (receitas)
+    const incomeTransactions = await transactionRepository.find({
+      where: { 
+        category: { id: readyToAssignCategory.id },
+        date: Between(startOfMonth, endOfMonth)
+      }
+    });
+    
+    // Somar receitas (valores negativos se tornam positivos)
+    const totalIncome = incomeTransactions.reduce((sum, transaction) => 
+      sum + Math.abs(Number(transaction.amount)), 0
+    );
+    
+    // Somar todas as alocações de outras categorias
     const groups = await this.findGroupsByMonth(month);
     let totalAllocated = 0;
     
     for (const group of groups) {
       for (const category of group.categories) {
-        totalAllocated += Number(category.allocatedAmount);
+        // Não contar a própria categoria "Pronto para Atribuir"
+        if (!category.isSpecial) {
+          totalAllocated += Number(category.allocatedAmount);
+        }
       }
     }
-
-    // Assumindo renda fixa de R$ 5000 para desenvolvimento
-    // TODO: Implementar sistema de renda dinâmica
-    const totalIncome = 5000;
+    
     return totalIncome - totalAllocated;
   }
 
@@ -220,5 +241,82 @@ export class BudgetsService {
 
     const spent = await this.getCategorySpent(categoryId);
     return Number(category.allocatedAmount) - spent;
+  }
+
+  async findOrCreateReadyToAssignCategory(month: Date): Promise<BudgetCategory> {
+    const startOfMonth = new Date(month.getFullYear(), month.getMonth(), 1);
+    
+    // Procurar categoria "Pronto para Atribuir" existente
+    const existingCategory = await this.budgetCategoriesRepository
+      .createQueryBuilder('category')
+      .innerJoin('category.group', 'group')
+      .where('category.name = :name', { name: 'Pronto para Atribuir' })
+      .andWhere('category.isSpecial = :isSpecial', { isSpecial: true })
+      .andWhere('group.monthYear = :monthYear', { monthYear: startOfMonth })
+      .getOne();
+
+    if (existingCategory) {
+      return existingCategory;
+    }
+
+    // Procurar ou criar grupo "Sistema"
+    let systemGroup = await this.budgetGroupsRepository.findOne({
+      where: { name: 'Sistema', monthYear: startOfMonth }
+    });
+
+    if (!systemGroup) {
+      systemGroup = this.budgetGroupsRepository.create({
+        name: 'Sistema',
+        monthYear: startOfMonth,
+      });
+      systemGroup = await this.budgetGroupsRepository.save(systemGroup);
+    }
+
+    // Criar categoria "Pronto para Atribuir"
+    const readyToAssignCategory = this.budgetCategoriesRepository.create({
+      name: 'Pronto para Atribuir',
+      allocatedAmount: 0,
+      isSpecial: true,
+      group: systemGroup,
+    });
+
+    return await this.budgetCategoriesRepository.save(readyToAssignCategory);
+  }
+
+  async addToReadyToAssign(amount: number, month: Date): Promise<void> {
+    const readyToAssignCategory = await this.findOrCreateReadyToAssignCategory(month);
+    const currentAmount = Number(readyToAssignCategory.allocatedAmount);
+    readyToAssignCategory.allocatedAmount = currentAmount + amount;
+    await this.budgetCategoriesRepository.save(readyToAssignCategory);
+  }
+
+  async getReadyToAssignTransactions(month: Date): Promise<any> {
+    const readyToAssignCategory = await this.findOrCreateReadyToAssignCategory(month);
+    const { Transaction } = await import('../transactions/entities/transaction.entity');
+    const transactionRepository = this.budgetGroupsRepository.manager.getRepository(Transaction);
+    
+    const startOfMonth = new Date(month.getFullYear(), month.getMonth(), 1);
+    const endOfMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+    
+    const transactions = await transactionRepository.find({
+      where: { 
+        category: { id: readyToAssignCategory.id },
+        date: Between(startOfMonth, endOfMonth)
+      },
+      relations: ['account', 'paidBy'],
+      order: { date: 'DESC' }
+    });
+
+    const total = transactions.reduce((sum, transaction) => sum + Math.abs(Number(transaction.amount)), 0);
+    
+    return {
+      total,
+      transactions,
+      category: {
+        id: readyToAssignCategory.id,
+        name: readyToAssignCategory.name,
+        allocatedAmount: readyToAssignCategory.allocatedAmount
+      }
+    };
   }
 }

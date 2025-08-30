@@ -85,4 +85,12 @@ export class BudgetsController {
     const targetMonth = month ? new Date(month) : new Date();
     return this.budgetsService.getCategorySpent(+id, targetMonth);
   }
+
+  @Get('ready-to-assign')
+  @ApiOperation({ summary: 'Obter transações da categoria "Pronto para Atribuir"' })
+  @ApiQuery({ name: 'month', required: false, description: 'Mês no formato YYYY-MM-DD' })
+  getReadyToAssignTransactions(@Query('month') month?: string) {
+    const targetMonth = month ? new Date(month) : new Date();
+    return this.budgetsService.getReadyToAssignTransactions(targetMonth);
+  }
 }

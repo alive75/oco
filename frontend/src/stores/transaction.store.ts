@@ -61,6 +61,7 @@ export const useTransactionStore = create<TransactionState>()(
     if (dto.categoryId) {
       const budgetStore = useBudgetStore.getState();
       budgetStore.loadBudget();
+      budgetStore.loadReadyToAssignTransactions();
     }
   },
   
@@ -79,6 +80,7 @@ export const useTransactionStore = create<TransactionState>()(
     if (dto.categoryId !== undefined) {
       const budgetStore = useBudgetStore.getState();
       budgetStore.loadBudget();
+      budgetStore.loadReadyToAssignTransactions();
     }
   },
   
@@ -96,6 +98,7 @@ export const useTransactionStore = create<TransactionState>()(
     if (transaction?.categoryId) {
       const budgetStore = useBudgetStore.getState();
       budgetStore.loadBudget();
+      budgetStore.loadReadyToAssignTransactions();
     }
   },
     }),

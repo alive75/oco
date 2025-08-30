@@ -15,9 +15,11 @@ export default function Budget() {
     currentMonth,
     groups,
     readyToAssign,
+    readyToAssignTransactions,
     isLoading,
     setCurrentMonth,
     loadBudget,
+    loadReadyToAssignTransactions,
     updateCategory,
     createGroup,
     createCategory
@@ -31,10 +33,12 @@ export default function Budget() {
   const [newGroupName, setNewGroupName] = useState('');
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryAmount, setNewCategoryAmount] = useState('');
+  const [showReadyToAssignDetails, setShowReadyToAssignDetails] = useState(false);
 
   useEffect(() => {
     loadBudget(currentMonth);
-  }, [loadBudget, currentMonth]);
+    loadReadyToAssignTransactions(currentMonth);
+  }, [loadBudget, loadReadyToAssignTransactions, currentMonth]);
 
   const formatMonthYear = (date: Date) => {
     const validDate = new Date(date);
@@ -160,9 +164,22 @@ export default function Budget() {
       <div className="bg-gray-800 rounded-lg p-6 mb-6 border-l-4 border-blue-500">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-gray-300">
-              Pronto para Atribuir
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-gray-300">
+                Pronto para Atribuir
+              </h2>
+              <button
+                onClick={() => setShowReadyToAssignDetails(!showReadyToAssignDetails)}
+                className="p-1 text-gray-400 hover:text-blue-400 transition-colors"
+                title="Ver transações"
+              >
+                {showReadyToAssignDetails ? (
+                  <ChevronUpIcon className="h-4 w-4" />
+                ) : (
+                  <ChevronDownIcon className="h-4 w-4" />
+                )}
+              </button>
+            </div>
             <p className="text-sm text-gray-400">
               Valor disponível para alocar em categorias
             </p>
@@ -173,6 +190,36 @@ export default function Budget() {
             {formatCurrency(readyToAssign)}
           </div>
         </div>
+
+        {/* Lista de transações "Pronto para Atribuir" */}
+        {showReadyToAssignDetails && (
+          <div className="mt-6 pt-4 border-t border-gray-700">
+            <h3 className="text-sm font-medium text-gray-300 mb-3">
+              Transações de Receita ({readyToAssignTransactions.length})
+            </h3>
+            {readyToAssignTransactions.length > 0 ? (
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {readyToAssignTransactions.map((transaction: any) => (
+                  <div key={transaction.id} className="flex items-center justify-between py-2 px-3 bg-gray-750 rounded">
+                    <div className="flex-1">
+                      <div className="text-sm text-gray-300">{transaction.payee}</div>
+                      <div className="text-xs text-gray-500">
+                        {new Date(transaction.date).toLocaleDateString('pt-BR')} • {transaction.account?.name}
+                      </div>
+                    </div>
+                    <div className="text-sm font-medium text-green-400">
+                      {formatCurrency(Math.abs(transaction.amount))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-sm text-gray-500 italic py-2">
+                Nenhuma transação de receita encontrada neste mês.
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Lista de Grupos */}
@@ -214,87 +261,123 @@ export default function Budget() {
                   {group.categories.map((category) => (
                     <div
                       key={category.id}
-                      className="flex items-center justify-between py-3 px-4 bg-gray-700 rounded-lg"
+                      className={`flex items-center justify-between py-3 px-4 rounded-lg ${
+                        category.isSpecial 
+                          ? 'bg-blue-900 border border-blue-600' 
+                          : 'bg-gray-700'
+                      }`}
                     >
                       <div className="flex-1">
-                        <h4 className="text-white font-medium">
+                        <h4 className={`font-medium ${
+                          category.isSpecial ? 'text-blue-300' : 'text-white'
+                        }`}>
                           {category.name}
+                          {category.isSpecial && (
+                            <span className="ml-2 text-xs bg-blue-600 px-2 py-1 rounded text-blue-100">
+                              RECEITAS
+                            </span>
+                          )}
                         </h4>
                         
-                        {/* Barra de Progresso */}
-                        <div className="mt-2">
-                          <div className="flex items-center justify-between text-sm text-gray-400 mb-1">
-                            <span>Gasto: {formatCurrency(category.spent)}</span>
-                            <span>Alocado: {formatCurrency(category.allocatedAmount)}</span>
+                        {/* Barra de Progresso - apenas para categorias normais */}
+                        {!category.isSpecial && (
+                          <div className="mt-2">
+                            <div className="flex items-center justify-between text-sm text-gray-400 mb-1">
+                              <span>Gasto: {formatCurrency(category.spent)}</span>
+                              <span>Alocado: {formatCurrency(category.allocatedAmount)}</span>
+                            </div>
+                            <div className="w-full bg-gray-600 rounded-full h-2">
+                              <div
+                                className={`h-2 rounded-full transition-all ${
+                                  getProgressColor(category.spent, category.allocatedAmount)
+                                }`}
+                                style={{
+                                  width: `${getProgressPercentage(
+                                    category.spent,
+                                    category.allocatedAmount
+                                  )}%`
+                                }}
+                              ></div>
+                            </div>
                           </div>
-                          <div className="w-full bg-gray-600 rounded-full h-2">
-                            <div
-                              className={`h-2 rounded-full transition-all ${
-                                getProgressColor(category.spent, category.allocatedAmount)
-                              }`}
-                              style={{
-                                width: `${getProgressPercentage(
-                                  category.spent,
-                                  category.allocatedAmount
-                                )}%`
-                              }}
-                            ></div>
+                        )}
+
+                        {/* Informação especial para categoria "Pronto para Atribuir" */}
+                        {category.isSpecial && (
+                          <div className="mt-2">
+                            <p className="text-xs text-blue-400">
+                              Total recebido no mês: {formatCurrency(category.allocatedAmount)}
+                            </p>
                           </div>
-                        </div>
+                        )}
                       </div>
 
                       <div className="flex items-center space-x-4 ml-4">
-                        {/* Campo de edição ou valor */}
-                        {editingCategory === category.id ? (
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={categoryValue}
-                              onChange={(e) => setCategoryValue(e.target.value)}
-                              className="w-24 px-2 py-1 bg-gray-600 border border-gray-500 rounded text-white text-sm"
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  saveCategoryAmount(category.id);
-                                } else if (e.key === 'Escape') {
-                                  cancelCategoryEdit();
-                                }
-                              }}
-                              autoFocus
-                            />
-                            <button
-                              onClick={() => saveCategoryAmount(category.id)}
-                              className="px-2 py-1 bg-green-600 hover:bg-green-700 rounded text-xs text-white"
-                            >
-                              ✓
-                            </button>
-                            <button
-                              onClick={cancelCategoryEdit}
-                              className="px-2 py-1 bg-gray-600 hover:bg-gray-700 rounded text-xs text-white"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => handleCategoryEdit(category.id, category.allocatedAmount)}
-                            className="text-right hover:bg-gray-600 px-2 py-1 rounded transition-colors duration-200"
-                          >
-                            <div className="text-white font-semibold">
-                              {formatCurrency(category.allocatedAmount)}
+                        {/* Campo de edição ou valor - categorias especiais não são editáveis */}
+                        {!category.isSpecial && (
+                          <>
+                            {editingCategory === category.id ? (
+                              <div className="flex items-center space-x-2">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={categoryValue}
+                                  onChange={(e) => setCategoryValue(e.target.value)}
+                                  className="w-24 px-2 py-1 bg-gray-600 border border-gray-500 rounded text-white text-sm"
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      saveCategoryAmount(category.id);
+                                    } else if (e.key === 'Escape') {
+                                      cancelCategoryEdit();
+                                    }
+                                  }}
+                                  autoFocus
+                                />
+                                <button
+                                  onClick={() => saveCategoryAmount(category.id)}
+                                  className="px-2 py-1 bg-green-600 hover:bg-green-700 rounded text-xs text-white"
+                                >
+                                  ✓
+                                </button>
+                                <button
+                                  onClick={cancelCategoryEdit}
+                                  className="px-2 py-1 bg-gray-600 hover:bg-gray-700 rounded text-xs text-white"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => handleCategoryEdit(category.id, category.allocatedAmount)}
+                                className="text-right hover:bg-gray-600 px-2 py-1 rounded transition-colors duration-200"
+                              >
+                                <div className="text-white font-semibold">
+                                  {formatCurrency(category.allocatedAmount)}
+                                </div>
+                              </button>
+                            )}
+
+                            {/* Valor Disponível */}
+                            <div className="text-right">
+                              <div className={`text-sm font-semibold ${
+                                category.available >= 0 ? 'text-green-400' : 'text-red-400'
+                              }`}>
+                                {formatCurrency(category.available)}
+                              </div>
+                              <div className="text-xs text-gray-400">Disponível</div>
                             </div>
-                          </button>
+                          </>
                         )}
 
-                        {/* Valor Disponível */}
-                        <div className="text-right">
-                          <div className={`text-sm font-semibold ${
-                            category.available >= 0 ? 'text-green-400' : 'text-red-400'
-                          }`}>
-                            {formatCurrency(category.available)}
+                        {/* Para categorias especiais, mostrar apenas valor total */}
+                        {category.isSpecial && (
+                          <div className="text-right">
+                            <div className="text-blue-300 font-semibold text-lg">
+                              {formatCurrency(category.allocatedAmount)}
+                            </div>
+                            <div className="text-xs text-blue-400">Total Recebido</div>
                           </div>
-                          <div className="text-xs text-gray-400">Disponível</div>
-                        </div>
+                        )}
                       </div>
                     </div>
                   ))}

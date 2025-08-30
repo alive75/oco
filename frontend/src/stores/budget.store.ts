@@ -8,11 +8,13 @@ interface BudgetState {
   currentMonth: Date;
   groups: BudgetGroup[];
   readyToAssign: number;
+  readyToAssignTransactions: any[];
   isLoading: boolean;
   
   // Actions
   setCurrentMonth: (month: Date) => void;
   loadBudget: (month?: Date) => Promise<void>;
+  loadReadyToAssignTransactions: (month?: Date) => Promise<void>;
   updateCategory: (categoryId: number, dto: UpdateCategoryDto) => Promise<void>;
   createGroup: (dto: CreateGroupDto) => Promise<void>;
   updateGroup: (id: number, dto: Partial<CreateGroupDto>) => Promise<void>;
@@ -27,11 +29,13 @@ export const useBudgetStore = create<BudgetState>()(
   currentMonth: new Date(),
   groups: [],
   readyToAssign: 0,
+  readyToAssignTransactions: [],
   isLoading: false,
   
   setCurrentMonth: (month) => {
     set({ currentMonth: month });
     get().loadBudget(month);
+    get().loadReadyToAssignTransactions(month);
   },
   
   loadBudget: async (month) => {
@@ -82,6 +86,17 @@ export const useBudgetStore = create<BudgetState>()(
       throw error;
     }
   },
+
+  loadReadyToAssignTransactions: async (month) => {
+    const targetMonth = month || get().currentMonth;
+    try {
+      const data = await budgetService.getReadyToAssignTransactions(targetMonth);
+      set({ readyToAssignTransactions: data.transactions || [] });
+    } catch (error) {
+      console.error('Erro ao carregar transações Pronto para Atribuir:', error);
+      set({ readyToAssignTransactions: [] });
+    }
+  },
   
   updateCategory: async (categoryId, dto) => {
     await budgetService.updateCategory(categoryId, dto);
@@ -89,6 +104,7 @@ export const useBudgetStore = create<BudgetState>()(
     const currentMonth = get().currentMonth;
     cache.invalidate(cacheKeys.budget(currentMonth));
     get().loadBudget();
+    get().loadReadyToAssignTransactions();
   },
   
   createGroup: async (dto) => {

@@ -71,5 +71,18 @@ export const budgetService = {
       console.error('Erro ao deletar categoria:', error);
       throw error;
     }
+  },
+
+  async getReadyToAssignTransactions(month: Date) {
+    try {
+      const validDate = new Date(month);
+      const { data } = await api.get('/budgets/ready-to-assign', {
+        params: { month: validDate.toISOString() }
+      });
+      return data;
+    } catch (error) {
+      console.error('Erro ao buscar transações Pronto para Atribuir:', error);
+      throw error;
+    }
   }
 };

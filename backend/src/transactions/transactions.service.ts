@@ -107,6 +107,11 @@ export class TransactionsService {
     // Atualizar saldo da conta
     await this.updateAccountBalance(account, createTransactionDto.amount);
 
+    // Verificar se é receita (inflow) e adicionar à categoria "Pronto para Atribuir"
+    if (this.isInflowTransaction(createTransactionDto.amount, account.type)) {
+      await this.handleInflowTransaction(createTransactionDto.amount, new Date(createTransactionDto.date));
+    }
+
     // Lógica especial para cartão de crédito
     if (account.type === AccountType.CREDIT_CARD && createTransactionDto.categoryId) {
       await this.handleCreditCardTransaction(account, createTransactionDto.categoryId, createTransactionDto.amount);
@@ -127,8 +132,51 @@ export class TransactionsService {
       throw new BadRequestException('Você não pode editar esta transação');
     }
 
-    // Reverter alteração no saldo da conta (valor antigo)
-    await this.updateAccountBalance(account, -Number(transaction.amount));
+    // SOLUÇÃO SIMPLIFICADA: Se não há mudança no valor, não mexer no saldo
+    const originalAmount = Number(transaction.amount);
+    const newAmount = updateTransactionDto.amount !== undefined 
+      ? updateTransactionDto.amount 
+      : originalAmount;
+
+    // Só atualizar saldo se o valor realmente mudou
+    if (originalAmount !== newAmount) {
+      // Calcular a diferença e aplicar diretamente
+      const difference = newAmount - originalAmount;
+      
+      // Atualizar saldo da conta baseado na diferença
+      const currentBalance = Number(account.balance);
+      let newBalance: number;
+
+      if (account.type === AccountType.CREDIT_CARD) {
+        // Para cartão de crédito, diferença positiva aumenta dívida
+        newBalance = currentBalance + difference;
+      } else {
+        // Para outras contas, diferença positiva diminui saldo (mais gastos)
+        newBalance = currentBalance - difference;
+      }
+
+      await this.accountsRepository.update(account.id, { balance: newBalance });
+      
+      // Lidar com receitas apenas se o valor mudou
+      // Reverter receita anterior se aplicável
+      if (this.isInflowTransaction(originalAmount, account.type)) {
+        try {
+          await this.handleInflowTransaction(-Math.abs(originalAmount), new Date(transaction.date));
+        } catch (error) {
+          console.error('Erro ao reverter receita anterior:', error);
+        }
+      }
+      
+      // Aplicar nova receita se aplicável
+      if (this.isInflowTransaction(newAmount, account.type)) {
+        try {
+          const transactionDate = updateTransactionDto.date ? new Date(updateTransactionDto.date) : new Date(transaction.date);
+          await this.handleInflowTransaction(newAmount, transactionDate);
+        } catch (error) {
+          console.error('Erro ao aplicar nova receita:', error);
+        }
+      }
+    }
 
     // Atualizar transação
     Object.assign(transaction, updateTransactionDto);
@@ -137,13 +185,6 @@ export class TransactionsService {
     }
 
     const updatedTransaction = await this.transactionsRepository.save(transaction);
-
-    // Aplicar novo valor ao saldo da conta
-    const newAmount = updateTransactionDto.amount !== undefined 
-      ? updateTransactionDto.amount 
-      : Number(transaction.amount);
-    await this.updateAccountBalance(account, newAmount);
-
     return this.findOne(updatedTransaction.id);
   }
 
@@ -161,6 +202,11 @@ export class TransactionsService {
 
     // Reverter valor no saldo da conta
     await this.updateAccountBalance(account, -Number(transaction.amount));
+
+    // Reverter receita se aplicável
+    if (this.isInflowTransaction(Number(transaction.amount), account.type)) {
+      await this.handleInflowTransaction(-Math.abs(Number(transaction.amount)), new Date(transaction.date));
+    }
 
     await this.transactionsRepository.remove(transaction);
   }
@@ -349,5 +395,41 @@ export class TransactionsService {
     );
 
     return { currentBill, transactions };
+  }
+
+  private isInflowTransaction(amount: number, accountType: AccountType): boolean {
+    // Para contas normais (corrente, poupança), receitas são valores negativos (entradas)
+    // Para cartões de crédito, não consideramos receitas
+    if (accountType === AccountType.CREDIT_CARD) {
+      return false;
+    }
+    
+    // Valores negativos representam receitas (dinheiro entrando na conta)
+    return amount < 0;
+  }
+
+  private async handleInflowTransaction(amount: number, transactionDate: Date): Promise<void> {
+    try {
+      // Importar o BudgetsService dinamicamente para evitar dependência circular
+      const { BudgetsService } = await import('../budgets/budgets.service');
+      const { BudgetGroup } = await import('../budgets/entities/budget-group.entity');
+      const { BudgetCategory } = await import('../budgets/entities/budget-category.entity');
+      
+      const budgetGroupRepository = this.transactionsRepository.manager.getRepository(BudgetGroup);
+      const budgetCategoryRepository = this.transactionsRepository.manager.getRepository(BudgetCategory);
+      
+      // Instanciar o BudgetsService
+      const budgetsService = new BudgetsService(budgetGroupRepository, budgetCategoryRepository);
+      
+      // Converter valor negativo em positivo (receita)
+      const inflowAmount = Math.abs(amount);
+      
+      // Adicionar à categoria "Pronto para Atribuir"
+      await budgetsService.addToReadyToAssign(inflowAmount, transactionDate);
+      
+    } catch (error) {
+      console.error('Erro ao processar transação de receita:', error);
+      // Não lançar erro para não impedir a transação principal
+    }
   }
 }
