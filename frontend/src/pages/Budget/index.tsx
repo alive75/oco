@@ -22,7 +22,8 @@ export default function Budget() {
     loadReadyToAssignTransactions,
     updateCategory,
     createGroup,
-    createCategory
+    createCategory,
+    clearBudgetCache
   } = useBudgetStore();
 
   const [expandedGroups, setExpandedGroups] = useState<Set<number>>(new Set());
@@ -168,6 +169,13 @@ export default function Budget() {
               <h2 className="text-lg font-semibold text-gray-300">
                 Pronto para Atribuir
               </h2>
+              <button
+                onClick={clearBudgetCache}
+                className="px-2 py-1 text-xs bg-yellow-600 hover:bg-yellow-700 text-white rounded transition-colors"
+                title="DEBUG: Limpar cache do orçamento"
+              >
+                🔄 Cache
+              </button>
               <button
                 onClick={() => setShowReadyToAssignDetails(!showReadyToAssignDetails)}
                 className="p-1 text-gray-400 hover:text-blue-400 transition-colors"

@@ -5,12 +5,12 @@ export const transactionService = {
   async getAll(filters?: TransactionFilters) {
     try {
       // Convert Date objects to ISO strings for API and filter out undefined values
-      let processedFilters: Record<string, any> = {};
+      let processedFilters: Record<string, unknown> = {};
       
       if (filters) {
         // Only add properties that have defined values
         Object.keys(filters).forEach(key => {
-          const value = (filters as any)[key];
+          const value = (filters as Record<string, unknown>)[key];
           if (value !== undefined && value !== null) {
             if (key === 'startDate' || key === 'endDate') {
               processedFilters[key] = value instanceof Date ? value.toISOString() : value;
@@ -27,8 +27,9 @@ export const transactionService = {
       return data;
     } catch (error) {
       console.error('Erro ao buscar transações:', error);
-      console.error('Request config:', error.config);
-      console.error('Response data:', error.response?.data);
+      const axiosError = error as { config?: unknown; response?: { data?: unknown } };
+      console.error('Request config:', axiosError.config);
+      console.error('Response data:', axiosError.response?.data);
       throw error;
     }
   },

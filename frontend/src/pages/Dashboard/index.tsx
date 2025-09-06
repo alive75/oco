@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { dashboardService } from '../../services/dashboard.service';
 
 interface DashboardSummary {
   readyToAssign: number;
@@ -26,20 +27,25 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Mock data for now - will connect to API later
-    setTimeout(() => {
-      setSummary({
-        readyToAssign: 2500.00,
-        totalBalance: 15800.50,
-        sharedExpenses: 850.75,
-      });
-      setRecentTransactions([
-        { id: 1, date: '2023-12-15', payee: 'Mercado Central', amount: -125.80, accountName: 'Conta Corrente', categoryName: 'Alimentação' },
-        { id: 2, date: '2023-12-14', payee: 'Posto Shell', amount: -89.90, accountName: 'Cartão Débito', categoryName: 'Transporte' },
-        { id: 3, date: '2023-12-13', payee: 'Netflix', amount: -29.90, accountName: 'Cartão Crédito', categoryName: 'Entretenimento' },
-      ]);
-      setIsLoading(false);
-    }, 1000);
+    const loadDashboardData = async () => {
+      try {
+        setIsLoading(true);
+        const [summaryData, transactionsData] = await Promise.all([
+          dashboardService.getSummary(),
+          dashboardService.getRecentTransactions()
+        ]);
+        
+        setSummary(summaryData);
+        setRecentTransactions(transactionsData);
+      } catch (error) {
+        console.error('Erro ao carregar dados do dashboard:', error);
+        // Manter valores padrão em caso de erro
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadDashboardData();
   }, []);
 
   const formatCurrency = (value: number) => {

@@ -1,13 +1,13 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import path from 'path'
+import { resolve } from 'path'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": resolve(__dirname, "./src"),
     },
   },
   build: {
@@ -20,24 +20,8 @@ export default defineConfig({
     // Generate source maps for production debugging
     sourcemap: true,
     
-    // Minify the output
-    minify: 'terser',
-    
-    // Terser options for better compression
-    terserOptions: {
-      compress: {
-        // Remove console.log in production
-        drop_console: true,
-        // Remove debugger statements
-        drop_debugger: true,
-        // Remove unused code
-        dead_code: true,
-      },
-      mangle: {
-        // Mangle variable names for smaller size
-        toplevel: true,
-      },
-    },
+    // Minify the output (using esbuild instead of terser for better performance)
+    minify: 'esbuild',
     
     // Rollup options for chunking
     rollupOptions: {
@@ -65,8 +49,8 @@ export default defineConfig({
     // Chunk size warning limit (500kb)
     chunkSizeWarningLimit: 500,
     
-    // Target modern browsers for smaller bundle size
-    target: ['es2020', 'edge88', 'firefox78', 'chrome87', 'safari14'],
+    // Target modern browsers for smaller bundle size (Vite 7 default baseline)
+    target: 'baseline-widely-available', // Chrome 107+, Edge 107+, Firefox 104+, Safari 16.0+
   },
   
   // Optimization for development
@@ -82,8 +66,8 @@ export default defineConfig({
     host: true,
   },
   
-  // Define global constants
+  // Define global constants  
   define: {
-    __APP_VERSION__: JSON.stringify(process.env.npm_package_version),
+    __APP_VERSION__: '"1.0.0"',
   },
 })

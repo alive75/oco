@@ -57,12 +57,12 @@ export const useTransactionStore = create<TransactionState>()(
     // Invalidate accounts cache since balance changed
     cache.invalidate(cacheKeys.accounts());
     
-    // Update budget if transaction has a category
-    if (dto.categoryId) {
-      const budgetStore = useBudgetStore.getState();
-      budgetStore.loadBudget();
-      budgetStore.loadReadyToAssignTransactions();
-    }
+    // Always update budget since any transaction can affect Ready to Assign
+    const budgetStore = useBudgetStore.getState();
+    const currentMonth = budgetStore.currentMonth;
+    cache.invalidate(cacheKeys.budget(currentMonth));
+    budgetStore.loadBudget();
+    budgetStore.loadReadyToAssignTransactions();
   },
   
   updateTransaction: async (id, dto) => {
@@ -76,16 +76,15 @@ export const useTransactionStore = create<TransactionState>()(
     // Invalidate accounts cache since balance changed
     cache.invalidate(cacheKeys.accounts());
     
-    // Update budget if transaction had/has a category
-    if (dto.categoryId !== undefined) {
-      const budgetStore = useBudgetStore.getState();
-      budgetStore.loadBudget();
-      budgetStore.loadReadyToAssignTransactions();
-    }
+    // Always update budget since any transaction can affect Ready to Assign
+    const budgetStore = useBudgetStore.getState();
+    const currentMonth = budgetStore.currentMonth;
+    cache.invalidate(cacheKeys.budget(currentMonth));
+    budgetStore.loadBudget();
+    budgetStore.loadReadyToAssignTransactions();
   },
   
   deleteTransaction: async (id) => {
-    const transaction = get().transactions.find(t => t.id === id);
     await transactionService.delete(id);
     set((state) => ({
       transactions: state.transactions.filter((t) => t.id !== id),
@@ -94,12 +93,12 @@ export const useTransactionStore = create<TransactionState>()(
     // Invalidate accounts cache since balance changed
     cache.invalidate(cacheKeys.accounts());
 
-    // Update budget if transaction had a category
-    if (transaction?.categoryId) {
-      const budgetStore = useBudgetStore.getState();
-      budgetStore.loadBudget();
-      budgetStore.loadReadyToAssignTransactions();
-    }
+    // Always update budget since any transaction can affect Ready to Assign
+    const budgetStore = useBudgetStore.getState();
+    const currentMonth = budgetStore.currentMonth;
+    cache.invalidate(cacheKeys.budget(currentMonth));
+    budgetStore.loadBudget();
+    budgetStore.loadReadyToAssignTransactions();
   },
     }),
     {

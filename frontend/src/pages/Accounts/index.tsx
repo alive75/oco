@@ -14,10 +14,6 @@ import {
   CreditCard as CreditCardIcon, 
   Building2 as BuildingLibraryIcon, 
   TrendingUp as TrendingUpIcon,
-  Calendar as CalendarIcon,
-  User as UserIcon,
-  Tag as TagIcon,
-  // DollarSign as DollarSignIcon,
   Edit as EditIcon,
   Trash as TrashIcon,
   Search as SearchIcon
@@ -33,15 +29,6 @@ export default function Accounts() {
   const [showTransactionForm, setShowTransactionForm] = useState(false);
   const [showAccountForm, setShowAccountForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
-  const [transactionForm, setTransactionForm] = useState<CreateTransactionDto>({
-    accountId: 0,
-    amount: 0,
-    date: new Date(),
-    payee: '',
-    isShared: false,
-    notes: ''
-  });
   const [accountForm, setAccountForm] = useState<CreateAccountDto>({
     name: '',
     type: 'CHECKING',
@@ -90,97 +77,13 @@ export default function Accounts() {
     if (!targetAccount) return;
     
     if (transaction) {
-      // Editing existing transaction
-      setTransactionForm({
-        accountId: transaction.accountId,
-        amount: transaction.amount,
-        date: new Date(transaction.date),
-        payee: transaction.payee,
-        isShared: transaction.isShared,
-        notes: transaction.notes || '',
-        categoryId: transaction.categoryId
-      });
-      setEditingTransaction(transaction);
     } else {
-      // Creating new transaction
-      setTransactionForm({
-        accountId: targetAccount.id,
-        amount: 0,
-        date: new Date(),
-        payee: '',
-        isShared: false,
-        notes: '',
-        categoryId: undefined
-      });
-      setEditingTransaction(null);
     }
     setShowTransactionForm(true);
   };
 
-  const validateTransactionForm = () => {
-    const errors: string[] = [];
-    
-    // Validate date - not in future
-    const today = new Date();
-    today.setHours(23, 59, 59, 999); // End of today
-    const transactionDate = new Date(transactionForm.date);
-    
-    if (transactionDate > today) {
-      errors.push('A data não pode ser no futuro');
-    }
-    
-    // Validate payee
-    if (!transactionForm.payee.trim()) {
-      errors.push('O nome do pagante é obrigatório');
-    } else if (transactionForm.payee.trim().length > 200) {
-      errors.push('O nome do pagante não pode ter mais de 200 caracteres');
-    }
-    
-    // Validate amount
-    if (transactionForm.amount <= 0) {
-      errors.push('O valor deve ser maior que zero');
-    } else if (transactionForm.amount > 1000000) {
-      errors.push('O valor não pode exceder R$ 1.000.000');
-    }
-    
-    // Validate notes length
-    if (transactionForm.notes && transactionForm.notes.length > 500) {
-      errors.push('As anotações não podem ter mais de 500 caracteres');
-    }
-    
-    return errors;
-  };
 
-  const handleTransactionSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Validate form
-    const errors = validateTransactionForm();
-    if (errors.length > 0) {
-      alert(`Erro de validação:\n\n${errors.join('\n')}`);
-      return;
-    }
-    
-    try {
-      if (editingTransaction) {
-        // Update existing transaction
-        await updateTransaction(editingTransaction.id, transactionForm);
-      } else {
-        // Create new transaction
-        await addTransaction(transactionForm);
-      }
-      
-      setShowTransactionForm(false);
-      setEditingTransaction(null);
-      // Reload accounts to update balances
-      loadAccounts();
-    } catch (error) {
-      console.error(`Erro ao ${editingTransaction ? 'atualizar' : 'criar'} transação:`, error);
-      alert(`Erro ao ${editingTransaction ? 'atualizar' : 'criar'} transação. Tente novamente.`);
-    }
-  };
-
-  const handleTransactionSave = async (transactionData: any) => {
+  const handleTransactionSave = async (transactionData: CreateTransactionDto & { id?: number }) => {
     console.log('Dados da transação sendo salvos:', transactionData);
     
     try {
@@ -198,8 +101,9 @@ export default function Accounts() {
       loadAccounts();
     } catch (error) {
       console.error('Erro ao salvar transação:', error);
-      console.error('Detalhes do erro:', error.response?.data);
-      alert(`Erro ao salvar transação: ${error.response?.data?.message || error.message}`);
+      const errorResponse = error as { response?: { data?: { message?: string } }; message?: string };
+      console.error('Detalhes do erro:', errorResponse.response?.data);
+      alert(`Erro ao salvar transação: ${errorResponse.response?.data?.message || errorResponse.message || 'Erro desconhecido'}`);
     }
   };
 
@@ -223,7 +127,7 @@ export default function Accounts() {
     }
   };
 
-  const handleTransactionUpdate = async (transactionId: number, data: any) => {
+  const handleTransactionUpdate = async (transactionId: number, data: CreateTransactionDto & { id?: number }) => {
     if (!transactionId || isNaN(transactionId) || transactionId <= 0) {
       console.error('ID da transação inválido:', transactionId);
       alert('Erro: ID da transação inválido.');
@@ -272,12 +176,13 @@ export default function Accounts() {
     
     try {
       await deleteAccount(accountId);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorResponse = error as { response?: { data?: { message?: string } }; message?: string };
       console.error('Erro ao deletar conta:', error);
       let errorMessage = 'Erro ao deletar conta. Tente novamente.';
       
-      if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
+      if (errorResponse.response?.data?.message) {
+        errorMessage = errorResponse.response.data.message;
       }
       
       alert(errorMessage);
@@ -295,23 +200,33 @@ export default function Accounts() {
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   // Componente para linha de transação (inline editing)
-  const TransactionRow = ({ isNew, transaction, allCategories, onSave, onCancel, onDelete }) => {
+  interface TransactionRowProps {
+    isNew: boolean;
+    transaction: Transaction | Record<string, never>;
+    allCategories: { id: number; name: string }[];
+    onSave: (data: CreateTransactionDto & { id?: number }) => Promise<void>;
+    onCancel: () => void;
+    onDelete?: () => Promise<void>;
+  }
+  
+  const TransactionRow = ({ isNew, transaction, allCategories, onSave, onCancel, onDelete }: TransactionRowProps) => {
     const [isEditing, setIsEditing] = useState(isNew);
+    const txn = transaction as Transaction;
     const [formData, setFormData] = useState({
-      date: isNew ? new Date().toISOString().slice(0, 10) : new Date(transaction.date).toISOString().slice(0, 10),
-      payee: isNew ? '' : transaction.payee,
-      categoryId: isNew ? '' : (transaction.categoryId || ''),
-      notes: isNew ? '' : (transaction.notes || ''),
-      isShared: isNew ? false : transaction.isShared,
-      paidAmount: isNew ? '' : (transaction.amount > 0 ? transaction.amount.toString() : ''),
-      receivedAmount: isNew ? '' : (transaction.amount < 0 ? Math.abs(transaction.amount).toString() : '')
+      date: isNew ? new Date().toISOString().slice(0, 10) : new Date(txn.date).toISOString().slice(0, 10),
+      payee: isNew ? '' : txn.payee || '',
+      categoryId: isNew ? '' : (txn.categoryId?.toString() || ''),
+      notes: isNew ? '' : (txn.notes || ''),
+      isShared: isNew ? false : txn.isShared || false,
+      paidAmount: isNew ? '' : (txn.amount && txn.amount > 0 ? txn.amount.toString() : ''),
+      receivedAmount: isNew ? '' : (txn.amount && txn.amount < 0 ? Math.abs(txn.amount).toString() : '')
     });
     
-    const [payeeSuggestions, setPayeeSuggestions] = useState([]);
+    const [payeeSuggestions, setPayeeSuggestions] = useState<string[]>([]);
     const [showPayeeSuggestions, setShowPayeeSuggestions] = useState(false);
-    const [payeeSearchTimeout, setPayeeSearchTimeout] = useState(null);
+    const [payeeSearchTimeout, setPayeeSearchTimeout] = useState<NodeJS.Timeout | null>(null);
 
-    const searchPayees = async (query) => {
+    const searchPayees = async (query: string) => {
       if (!query || query.length < 2) {
         setPayeeSuggestions([]);
         setShowPayeeSuggestions(false);
@@ -329,7 +244,7 @@ export default function Accounts() {
       }
     };
 
-    const handlePayeeChange = (value) => {
+    const handlePayeeChange = (value: string) => {
       setFormData({ ...formData, payee: value });
       
       // Debounce the search
@@ -344,13 +259,13 @@ export default function Accounts() {
       setPayeeSearchTimeout(timeout);
     };
 
-    const selectPayee = (payee) => {
+    const selectPayee = (payee: string) => {
       setFormData({ ...formData, payee });
       setShowPayeeSuggestions(false);
       setPayeeSuggestions([]);
     };
 
-    const handleSave = (e) => {
+    const handleSave = (e: React.FormEvent) => {
       e.preventDefault();
       
       // Validações
@@ -377,9 +292,14 @@ export default function Accounts() {
       // Valores negativos = receitas (aumentam saldo)
       const amount = receivedAmount > 0 ? -receivedAmount : paidAmount;
       
+      if (!selectedAccount) {
+        alert('Nenhuma conta selecionada');
+        return;
+      }
+      
       const data = {
         accountId: selectedAccount.id,
-        date: formData.date, // Manter como string no formato ISO
+        date: new Date(formData.date), // Convert string to Date
         payee: formData.payee.trim(),
         amount: amount,
         categoryId: formData.categoryId && parseInt(formData.categoryId) > 0 ? parseInt(formData.categoryId) : undefined,
@@ -412,13 +332,13 @@ export default function Accounts() {
         setIsEditing(false);
         // Reset form data
         setFormData({
-          date: new Date(transaction.date).toISOString().slice(0, 10),
-          payee: transaction.payee,
-          categoryId: transaction.categoryId || '',
-          notes: transaction.notes || '',
-          isShared: transaction.isShared,
-          paidAmount: transaction.amount < 0 ? Math.abs(transaction.amount).toString() : '',
-          receivedAmount: transaction.amount >= 0 ? transaction.amount.toString() : ''
+          date: new Date(txn.date).toISOString().slice(0, 10),
+          payee: txn.payee || '',
+          categoryId: txn.categoryId?.toString() || '',
+          notes: txn.notes || '',
+          isShared: txn.isShared || false,
+          paidAmount: txn.amount && txn.amount < 0 ? Math.abs(txn.amount).toString() : '',
+          receivedAmount: txn.amount && txn.amount >= 0 ? txn.amount.toString() : ''
         });
       }
     };
@@ -542,29 +462,29 @@ export default function Accounts() {
     return (
       <tr className="hover:bg-gray-750 transition-colors duration-200">
         <td className="px-4 py-4 text-sm text-gray-300">
-          {formatTransactionDate(transaction.date)}
+          {txn.date ? formatTransactionDate(txn.date) : '-'}
         </td>
         <td className="px-4 py-4 text-sm text-white font-medium">
-          {transaction.payee}
+          {txn.payee || '-'}
         </td>
         <td className="px-4 py-4 text-sm text-gray-300">
-          {transaction.category?.name || '-'}
+          {txn.category?.name || '-'}
         </td>
         <td className="px-4 py-4 text-sm text-gray-300">
-          {transaction.notes || '-'}
+          {txn.notes || '-'}
         </td>
         <td className="px-4 py-4 text-center">
-          {transaction.isShared && (
+          {txn.isShared && (
             <span className="px-2 py-1 bg-blue-600 text-xs rounded text-white">
               ✓
             </span>
           )}
         </td>
         <td className="px-4 py-4 text-sm text-right text-red-400 font-medium">
-          {transaction.amount > 0 ? formatCurrency(transaction.amount) : '-'}
+          {txn.amount && txn.amount > 0 ? formatCurrency(txn.amount) : '-'}
         </td>
         <td className="px-4 py-4 text-sm text-right text-green-400 font-medium">
-          {transaction.amount < 0 ? formatCurrency(Math.abs(transaction.amount)) : '-'}
+          {txn.amount && txn.amount < 0 ? formatCurrency(Math.abs(txn.amount)) : '-'}
         </td>
         <td className="px-4 py-4 text-center">
           <div className="flex items-center justify-center space-x-1">
@@ -810,10 +730,11 @@ export default function Accounts() {
                           {showTransactionForm && (
                             <TransactionRow
                               isNew={true}
-                              transaction={{}}
+                              transaction={{} as Record<string, never>}
                               allCategories={allCategories}
                               onSave={handleTransactionSave}
                               onCancel={() => setShowTransactionForm(false)}
+                              onDelete={() => Promise.resolve()}
                             />
                           )}
                           
@@ -826,6 +747,7 @@ export default function Accounts() {
                                 transaction={transaction}
                                 allCategories={allCategories}
                                 onSave={(data) => handleTransactionUpdate(transaction.id, data)}
+                                onCancel={() => {}}
                                 onDelete={() => handleDeleteTransaction(transaction.id)}
                               />
                             ))

@@ -5,6 +5,7 @@ export interface BudgetCategory {
   spent: number;
   available: number;
   groupId: number;
+  isSpecial?: boolean;
 }
 
 export interface BudgetGroup {
@@ -30,6 +31,7 @@ export interface CreateCategoryDto {
   name: string;
   allocatedAmount: number;
   groupId: number;
+  isSpecial?: boolean;
 }
 
 export interface UpdateCategoryDto {

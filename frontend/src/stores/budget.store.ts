@@ -8,7 +8,7 @@ interface BudgetState {
   currentMonth: Date;
   groups: BudgetGroup[];
   readyToAssign: number;
-  readyToAssignTransactions: any[];
+  readyToAssignTransactions: unknown[];
   isLoading: boolean;
   
   // Actions
@@ -21,6 +21,7 @@ interface BudgetState {
   deleteGroup: (id: number) => Promise<void>;
   createCategory: (dto: CreateCategoryDto) => Promise<void>;
   deleteCategory: (id: number) => Promise<void>;
+  clearBudgetCache: () => void;
 }
 
 export const useBudgetStore = create<BudgetState>()(
@@ -103,6 +104,18 @@ export const useBudgetStore = create<BudgetState>()(
     // Invalidate cache and reload budget
     const currentMonth = get().currentMonth;
     cache.invalidate(cacheKeys.budget(currentMonth));
+    get().loadBudget();
+    get().loadReadyToAssignTransactions();
+  },
+
+  clearBudgetCache: () => {
+    // Clear cache for multiple months to be safe
+    const currentDate = new Date();
+    for (let i = -2; i <= 2; i++) {
+      const targetMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + i, 1);
+      cache.invalidate(cacheKeys.budget(targetMonth));
+    }
+    // Force reload current month
     get().loadBudget();
     get().loadReadyToAssignTransactions();
   },

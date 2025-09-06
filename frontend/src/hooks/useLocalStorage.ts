@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 export function useLocalStorage<T>(key: string, initialValue: T) {
   // State to store our value
@@ -36,7 +36,7 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
 }
 
 // Hook for persisting filters with expiration
-export function usePersistedFilters<T extends Record<string, any>>(
+export function usePersistedFilters<T extends Record<string, unknown>>(
   key: string, 
   initialValue: T,
   expirationMinutes?: number
