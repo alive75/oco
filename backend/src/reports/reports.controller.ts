@@ -39,4 +39,18 @@ export class ReportsController {
     
     return this.reportsService.getCashFlow(start, end, req.user.userId);
   }
+
+  @Get('dashboard-summary')
+  @ApiOperation({ summary: 'Resumo para o dashboard' })
+  getDashboardSummary(@Request() req) {
+    return this.reportsService.getDashboardSummary(req.user.userId);
+  }
+
+  @Get('recent-transactions')
+  @ApiOperation({ summary: 'Transações recentes' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Número máximo de transações' })
+  getRecentTransactions(@Request() req, @Query('limit') limit?: string) {
+    const limitNumber = limit ? parseInt(limit, 10) : 5;
+    return this.reportsService.getRecentTransactions(req.user.userId, limitNumber);
+  }
 }

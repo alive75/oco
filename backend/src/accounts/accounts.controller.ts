@@ -41,4 +41,10 @@ export class AccountsController {
   remove(@Param('id') id: string, @Request() req) {
     return this.accountsService.remove(+id, req.user.userId);
   }
+
+  @Post('cleanup-orphaned-credit-cards')
+  @ApiOperation({ summary: 'Limpar categorias órfãs de cartão de crédito' })
+  cleanupOrphanedCreditCards() {
+    return this.accountsService.cleanupOrphanedCreditCardCategories();
+  }
 }

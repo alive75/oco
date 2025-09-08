@@ -100,6 +100,54 @@ export class AccountsService {
     }
   }
 
+  private async removeCreditCardCategory(accountName: string): Promise<void> {
+    try {
+      // Importar entidades dinamicamente para evitar dependência circular
+      const { BudgetCategory } = await import('../budgets/entities/budget-category.entity');
+      const { BudgetGroup } = await import('../budgets/entities/budget-group.entity');
+      
+      const budgetCategoryRepository = this.accountsRepository.manager.getRepository(BudgetCategory);
+      const budgetGroupRepository = this.accountsRepository.manager.getRepository(BudgetGroup);
+
+      // Buscar categoria com o nome "Pagamento [Nome do Cartão]"
+      const categoryName = `Pagamento ${accountName}`;
+      const category = await budgetCategoryRepository.findOne({
+        where: { name: categoryName },
+        relations: ['group']
+      });
+
+      if (category) {
+        // Verificar se há transações vinculadas à categoria
+        const transactionCount = await this.transactionsRepository.count({
+          where: { category: { id: category.id } }
+        });
+
+        if (transactionCount > 0) {
+          console.warn(`Categoria "${categoryName}" possui ${transactionCount} transações vinculadas. Não será removida automaticamente.`);
+          return;
+        }
+
+        const group = category.group;
+        
+        // Remover a categoria
+        await budgetCategoryRepository.remove(category);
+
+        // Se o grupo ficou vazio e é "Cartões de Crédito", considerar remover também
+        const remainingCategories = await budgetCategoryRepository.count({
+          where: { group: { id: group.id } }
+        });
+
+        if (remainingCategories === 0 && group.name === 'Cartões de Crédito') {
+          await budgetGroupRepository.remove(group);
+        }
+      }
+
+    } catch (error) {
+      console.error('Erro ao remover categoria do cartão de crédito:', error);
+      // Não falhar a exclusão da conta se não conseguir remover a categoria
+    }
+  }
+
   async update(id: number, updateAccountDto: UpdateAccountDto, userId: number): Promise<Account> {
     const account = await this.findOne(id, userId);
     
@@ -121,10 +169,85 @@ export class AccountsService {
       );
     }
     
+    // Se for cartão de crédito, remover categoria correspondente
+    if (account.type === AccountType.CREDIT_CARD) {
+      await this.removeCreditCardCategory(account.name);
+    }
+    
     await this.accountsRepository.remove(account);
   }
 
   async updateBalance(id: number, newBalance: number): Promise<void> {
     await this.accountsRepository.update(id, { balance: newBalance });
+  }
+
+  /**
+   * Remove categorias órfãs de cartão de crédito (categorias que não têm conta correspondente)
+   */
+  async cleanupOrphanedCreditCardCategories(): Promise<{ removed: number }> {
+    try {
+      // Importar entidades dinamicamente
+      const { BudgetCategory } = await import('../budgets/entities/budget-category.entity');
+      const { BudgetGroup } = await import('../budgets/entities/budget-group.entity');
+      
+      const budgetCategoryRepository = this.accountsRepository.manager.getRepository(BudgetCategory);
+      const budgetGroupRepository = this.accountsRepository.manager.getRepository(BudgetGroup);
+
+      // Buscar todos os cartões de crédito existentes
+      const creditCardAccounts = await this.accountsRepository.find({
+        where: { type: AccountType.CREDIT_CARD }
+      });
+
+      const existingAccountNames = creditCardAccounts.map(account => `Pagamento ${account.name}`);
+
+      // Buscar categorias do grupo "Cartões de Crédito" que começam com "Pagamento"
+      const creditCardCategories = await budgetCategoryRepository
+        .createQueryBuilder('category')
+        .innerJoin('category.group', 'group')
+        .where('group.name = :groupName', { groupName: 'Cartões de Crédito' })
+        .andWhere('category.name LIKE :pattern', { pattern: 'Pagamento %' })
+        .getMany();
+
+      let removedCount = 0;
+
+      // Remover categorias órfãs (sem conta correspondente)
+      for (const category of creditCardCategories) {
+        if (!existingAccountNames.includes(category.name)) {
+          // Verificar se há transações vinculadas
+          const transactionCount = await this.transactionsRepository.count({
+            where: { category: { id: category.id } }
+          });
+
+          if (transactionCount === 0) {
+            await budgetCategoryRepository.remove(category);
+            removedCount++;
+            console.log(`Categoria órfã removida: ${category.name}`);
+          } else {
+            console.warn(`Categoria órfã "${category.name}" possui ${transactionCount} transações vinculadas. Não foi removida.`);
+          }
+        }
+      }
+
+      // Verificar se o grupo "Cartões de Crédito" ficou vazio
+      const remainingCategories = await budgetCategoryRepository.count({
+        where: { group: { name: 'Cartões de Crédito' } }
+      });
+
+      if (remainingCategories === 0) {
+        const emptyGroup = await budgetGroupRepository.findOne({
+          where: { name: 'Cartões de Crédito' }
+        });
+        if (emptyGroup) {
+          await budgetGroupRepository.remove(emptyGroup);
+          console.log('Grupo "Cartões de Crédito" vazio foi removido');
+        }
+      }
+
+      return { removed: removedCount };
+
+    } catch (error) {
+      console.error('Erro ao limpar categorias órfãs de cartão de crédito:', error);
+      throw error;
+    }
   }
 }

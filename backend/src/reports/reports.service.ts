@@ -216,4 +216,78 @@ export class ReportsService {
       dailyBreakdown
     };
   }
+
+  async getDashboardSummary(userId: number): Promise<{
+    readyToAssign: number;
+    totalBalance: number;
+    sharedExpenses: number;
+  }> {
+    const currentMonth = new Date();
+    
+    // Buscar valor "Pronto para Atribuir"
+    const { BudgetsService } = await import('../budgets/budgets.service');
+    const { BudgetGroup } = await import('../budgets/entities/budget-group.entity');
+    const { BudgetCategory } = await import('../budgets/entities/budget-category.entity');
+    
+    const budgetGroupRepository = this.transactionsRepository.manager.getRepository(BudgetGroup);
+    const budgetCategoryRepository = this.transactionsRepository.manager.getRepository(BudgetCategory);
+    const budgetsService = new BudgetsService(budgetGroupRepository, budgetCategoryRepository);
+    
+    const readyToAssign = await budgetsService.getReadyToAssign(currentMonth);
+
+    // Buscar saldo total das contas
+    const accountsBalance = await this.getAccountsBalance(userId);
+    const totalBalance = accountsBalance.totalBalance;
+
+    // Calcular gastos compartilhados do mês atual
+    const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+    const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+
+    const sharedTransactions = await this.transactionsRepository.createQueryBuilder('transaction')
+      .leftJoinAndSelect('transaction.account', 'account')
+      .leftJoinAndSelect('account.user', 'user')
+      .where('user.id = :userId', { userId })
+      .andWhere('transaction.isShared = :isShared', { isShared: true })
+      .andWhere('transaction.date BETWEEN :startDate AND :endDate', {
+        startDate: startOfMonth,
+        endDate: endOfMonth
+      })
+      .getMany();
+
+    const sharedExpenses = sharedTransactions.reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0);
+
+    return {
+      readyToAssign,
+      totalBalance,
+      sharedExpenses
+    };
+  }
+
+  async getRecentTransactions(userId: number, limit: number = 5): Promise<Array<{
+    id: number;
+    date: Date;
+    payee: string;
+    amount: number;
+    accountName: string;
+    categoryName?: string;
+  }>> {
+    const transactions = await this.transactionsRepository.createQueryBuilder('transaction')
+      .leftJoinAndSelect('transaction.account', 'account')
+      .leftJoinAndSelect('transaction.category', 'category')
+      .leftJoinAndSelect('account.user', 'user')
+      .where('user.id = :userId', { userId })
+      .orderBy('transaction.date', 'DESC')
+      .addOrderBy('transaction.createdAt', 'DESC')
+      .limit(limit)
+      .getMany();
+
+    return transactions.map(t => ({
+      id: t.id,
+      date: t.date,
+      payee: t.payee,
+      amount: Number(t.amount),
+      accountName: t.account?.name || 'Conta desconhecida',
+      categoryName: t.category?.name
+    }));
+  }
 }

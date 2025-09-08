@@ -2,22 +2,28 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import * as dotenv from 'dotenv';
-
-// Load environment variables
-dotenv.config();
+import { ConfigService } from '@nestjs/config';
+import { Logger } from '@nestjs/common';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const configService = app.get(ConfigService);
+  const logger = new Logger('Bootstrap');
   
+  // Enhanced global validation pipe with better error handling
   app.useGlobalPipes(new ValidationPipe({
     transform: true,
+    whitelist: true, // Strip properties that don't have decorators
+    forbidNonWhitelisted: true, // Throw error if non-whitelisted properties are present
     transformOptions: {
       enableImplicitConversion: true,
     },
   }));
+  
+  // CORS configuration with environment variables
+  const frontendUrl = configService.get('FRONTEND_URL') || 'http://localhost:5173';
   app.enableCors({
-    origin: 'http://localhost:5173',
+    origin: frontendUrl,
     credentials: true,
   });
 
@@ -61,8 +67,10 @@ async function bootstrap() {
     }
   });
   
-  await app.listen(3000);
-  console.log('OCO Backend running on http://localhost:3000');
-  console.log('Swagger docs available at http://localhost:3000/api/docs');
+  const port = configService.get('PORT') || 3000;
+  await app.listen(port);
+  
+  logger.log(`🚀 OCO Backend running on http://localhost:${port}`);
+  logger.log(`📚 Swagger docs available at http://localhost:${port}/api/docs`);
 }
 bootstrap();

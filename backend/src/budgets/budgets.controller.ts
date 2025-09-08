@@ -93,4 +93,16 @@ export class BudgetsController {
     const targetMonth = month ? new Date(month) : new Date();
     return this.budgetsService.getReadyToAssignTransactions(targetMonth);
   }
+
+  @Post('fix-duplicate-system-groups')
+  @ApiOperation({ summary: 'Corrigir grupos "Sistema" duplicados (DEBUG)' })
+  async fixDuplicateSystemGroups() {
+    return this.budgetsService.fixDuplicateSystemGroups();
+  }
+
+  @Post('sync-groups-across-months')
+  @ApiOperation({ summary: 'Sincronizar todos os grupos em todos os meses existentes' })
+  async syncGroupsAcrossMonths() {
+    return this.budgetsService.syncGroupsAcrossMonths();
+  }
 }

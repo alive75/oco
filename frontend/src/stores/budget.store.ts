@@ -21,7 +21,6 @@ interface BudgetState {
   deleteGroup: (id: number) => Promise<void>;
   createCategory: (dto: CreateCategoryDto) => Promise<void>;
   deleteCategory: (id: number) => Promise<void>;
-  clearBudgetCache: () => void;
 }
 
 export const useBudgetStore = create<BudgetState>()(
@@ -108,17 +107,6 @@ export const useBudgetStore = create<BudgetState>()(
     get().loadReadyToAssignTransactions();
   },
 
-  clearBudgetCache: () => {
-    // Clear cache for multiple months to be safe
-    const currentDate = new Date();
-    for (let i = -2; i <= 2; i++) {
-      const targetMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + i, 1);
-      cache.invalidate(cacheKeys.budget(targetMonth));
-    }
-    // Force reload current month
-    get().loadBudget();
-    get().loadReadyToAssignTransactions();
-  },
   
   createGroup: async (dto) => {
     await budgetService.createGroup(dto);

@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, CreateDateColumn } from 'typeorm';
 import { BudgetGroup } from './budget-group.entity';
 import { Transaction } from '../../transactions/entities/transaction.entity';
+import { BudgetAllocation } from './budget-allocation.entity';
 
 @Entity('budget_categories')
 export class BudgetCategory {
@@ -13,6 +14,9 @@ export class BudgetCategory {
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
   allocatedAmount: number;
 
+  @Column({ default: false })
+  isSpecial: boolean;
+
   @CreateDateColumn()
   createdAt: Date;
 
@@ -21,4 +25,7 @@ export class BudgetCategory {
 
   @OneToMany(() => Transaction, transaction => transaction.category)
   transactions: Transaction[];
+
+  @OneToMany(() => BudgetAllocation, allocation => allocation.category)
+  allocations: BudgetAllocation[];
 }

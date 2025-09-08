@@ -7,7 +7,11 @@ import {
   ChevronRight as ChevronRightIcon, 
   Plus as PlusIcon,
   ChevronDown as ChevronDownIcon,
-  ChevronUp as ChevronUpIcon 
+  ChevronUp as ChevronUpIcon,
+  Edit3 as EditIcon,
+  Trash2 as TrashIcon,
+  Check as CheckIcon,
+  X as XIcon
 } from 'lucide-react';
 
 export default function Budget() {
@@ -22,13 +26,17 @@ export default function Budget() {
     loadReadyToAssignTransactions,
     updateCategory,
     createGroup,
+    updateGroup,
+    deleteGroup,
     createCategory,
-    clearBudgetCache
+    deleteCategory,
   } = useBudgetStore();
 
   const [expandedGroups, setExpandedGroups] = useState<Set<number>>(new Set());
   const [editingCategory, setEditingCategory] = useState<number | null>(null);
   const [categoryValue, setCategoryValue] = useState<string>('');
+  const [editingGroup, setEditingGroup] = useState<number | null>(null);
+  const [groupValue, setGroupValue] = useState<string>('');
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [showCreateCategory, setShowCreateCategory] = useState<number | null>(null);
   const [newGroupName, setNewGroupName] = useState('');
@@ -93,10 +101,9 @@ export default function Budget() {
     if (!newGroupName.trim()) return;
     
     try {
-      const validDate = new Date(currentMonth);
       await createGroup({
         name: newGroupName,
-        monthYear: validDate.toISOString().slice(0, 10) // YYYY-MM-DD format
+        monthYear: currentMonth.toISOString().split('T')[0]
       });
       setNewGroupName('');
       setShowCreateGroup(false);
@@ -109,10 +116,9 @@ export default function Budget() {
     if (!newCategoryName.trim()) return;
     
     try {
-      const amount = parseFloat(newCategoryAmount) || 0;
       await createCategory({
         name: newCategoryName,
-        allocatedAmount: amount,
+        allocatedAmount: parseFloat(newCategoryAmount) || 0,
         groupId: groupId
       });
       setNewCategoryName('');
@@ -120,6 +126,54 @@ export default function Budget() {
       setShowCreateCategory(null);
     } catch (error) {
       console.error('Erro ao criar categoria:', error);
+    }
+  };
+
+  const handleEditGroup = (groupId: number, currentName: string) => {
+    setEditingGroup(groupId);
+    setGroupValue(currentName);
+  };
+
+  const handleSaveGroup = async () => {
+    if (!editingGroup || !groupValue.trim()) return;
+    
+    try {
+      await updateGroup(editingGroup, { name: groupValue });
+      setEditingGroup(null);
+      setGroupValue('');
+    } catch (error) {
+      console.error('Erro ao editar grupo:', error);
+    }
+  };
+
+  const handleCancelEditGroup = () => {
+    setEditingGroup(null);
+    setGroupValue('');
+  };
+
+  const handleDeleteGroup = async (groupId: number, groupName: string) => {
+    if (!window.confirm(`Tem certeza que deseja deletar o grupo "${groupName}"? Esta ação irá deletar o grupo em todos os meses e não pode ser desfeita.`)) {
+      return;
+    }
+    
+    try {
+      await deleteGroup(groupId);
+    } catch (error) {
+      console.error('Erro ao deletar grupo:', error);
+      alert('Não foi possível deletar o grupo. Verifique se não há categorias com transações associadas.');
+    }
+  };
+
+  const handleDeleteCategory = async (categoryId: number, categoryName: string) => {
+    if (!window.confirm(`Tem certeza que deseja deletar a categoria "${categoryName}"? Esta ação irá deletar a categoria em todos os meses e não pode ser desfeita.`)) {
+      return;
+    }
+    
+    try {
+      await deleteCategory(categoryId);
+    } catch (error) {
+      console.error('Erro ao deletar categoria:', error);
+      alert('Não foi possível deletar a categoria. Verifique se não há transações associadas.');
     }
   };
 
@@ -169,13 +223,6 @@ export default function Budget() {
               <h2 className="text-lg font-semibold text-gray-300">
                 Pronto para Atribuir
               </h2>
-              <button
-                onClick={clearBudgetCache}
-                className="px-2 py-1 text-xs bg-yellow-600 hover:bg-yellow-700 text-white rounded transition-colors"
-                title="DEBUG: Limpar cache do orçamento"
-              >
-                🔄 Cache
-              </button>
               <button
                 onClick={() => setShowReadyToAssignDetails(!showReadyToAssignDetails)}
                 className="p-1 text-gray-400 hover:text-blue-400 transition-colors"
@@ -233,32 +280,101 @@ export default function Budget() {
       {/* Lista de Grupos */}
       <div className="space-y-4">
         {groups.map((group) => (
-          <div key={group.id} className="bg-gray-800 rounded-lg overflow-hidden">
+          <div key={group.id} className="bg-gray-800 rounded-lg overflow-hidden group">
             {/* Header do Grupo */}
-            <div
-              className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-700 transition-colors duration-200"
-              onClick={() => toggleGroup(group.id)}
-            >
-              <div className="flex items-center space-x-3">
+            <div className="flex items-center justify-between p-4 hover:bg-gray-700 transition-colors duration-200">
+              <div 
+                className="flex items-center space-x-3 cursor-pointer flex-1"
+                onClick={() => toggleGroup(group.id)}
+              >
                 {expandedGroups.has(group.id) ? (
                   <ChevronDownIcon className="h-5 w-5 text-gray-400" />
                 ) : (
                   <ChevronUpIcon className="h-5 w-5 text-gray-400" />
                 )}
-                <div>
-                  <h3 className="text-lg font-semibold text-white">
-                    {group.name}
-                  </h3>
-                  <p className="text-sm text-gray-400">
-                    {group.categories.length} categorias
-                  </p>
+                <div className="flex-1">
+                  {editingGroup === group.id ? (
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="text"
+                        value={groupValue}
+                        onChange={(e) => setGroupValue(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            handleSaveGroup();
+                          }
+                          if (e.key === 'Escape') {
+                            handleCancelEditGroup();
+                          }
+                        }}
+                        className="bg-gray-600 text-white px-2 py-1 rounded text-lg font-semibold flex-1"
+                        autoFocus
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSaveGroup();
+                        }}
+                        className="p-1 text-green-400 hover:text-green-300"
+                      >
+                        <CheckIcon className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCancelEditGroup();
+                        }}
+                        className="p-1 text-red-400 hover:text-red-300"
+                      >
+                        <XIcon className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <h3 className="text-lg font-semibold text-white">
+                        {group.name}
+                      </h3>
+                      <p className="text-sm text-gray-400">
+                        {group.categories.length} categorias
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
-              <div className="text-right">
-                <div className="text-lg font-semibold text-white">
-                  {formatCurrency(group.totalAllocated)}
+              
+              <div className="flex items-center space-x-3">
+                <div className="text-right">
+                  <div className="text-lg font-semibold text-white">
+                    {formatCurrency(group.totalAllocated)}
+                  </div>
+                  <div className="text-sm text-gray-400">Total alocado</div>
                 </div>
-                <div className="text-sm text-gray-400">Total alocado</div>
+                
+                {group.name !== 'Sistema' && (
+                  <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditGroup(group.id, group.name);
+                      }}
+                      className="p-2 text-gray-400 hover:text-blue-400 rounded-md hover:bg-gray-600"
+                      title="Editar grupo"
+                    >
+                      <EditIcon className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteGroup(group.id, group.name);
+                      }}
+                      className="p-2 text-gray-400 hover:text-red-400 rounded-md hover:bg-gray-600"
+                      title="Deletar grupo"
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -374,11 +490,45 @@ export default function Budget() {
                               </div>
                               <div className="text-xs text-gray-400">Disponível</div>
                             </div>
+
+                            {/* Botões de ação para categorias não especiais */}
+                            <div className="flex space-x-1">
+                              <button
+                                onClick={() => handleDeleteCategory(category.id, category.name)}
+                                className="p-1 text-gray-400 hover:text-red-400 rounded"
+                                title="Deletar categoria"
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </button>
+                            </div>
                           </>
                         )}
 
                         {/* Para categorias especiais, mostrar apenas valor total */}
-                        {category.isSpecial && (
+                        {category.isSpecial && category.name !== 'Pronto para Atribuir' && (
+                          <>
+                            <div className="text-right">
+                              <div className="text-blue-300 font-semibold text-lg">
+                                {formatCurrency(category.allocatedAmount)}
+                              </div>
+                              <div className="text-xs text-blue-400">Total Recebido</div>
+                            </div>
+                            
+                            {/* Botões de ação para categorias especiais (exceto Pronto para Atribuir) */}
+                            <div className="flex space-x-1">
+                              <button
+                                onClick={() => handleDeleteCategory(category.id, category.name)}
+                                className="p-1 text-gray-400 hover:text-red-400 rounded"
+                                title="Deletar categoria"
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </>
+                        )}
+
+                        {/* Para a categoria especial "Pronto para Atribuir", apenas o valor */}
+                        {category.isSpecial && category.name === 'Pronto para Atribuir' && (
                           <div className="text-right">
                             <div className="text-blue-300 font-semibold text-lg">
                               {formatCurrency(category.allocatedAmount)}
